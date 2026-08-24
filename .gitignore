@@ -1,0 +1,23 @@
+# Dependencias
+node_modules/
+
+# Archivos de construcción
+dist/
+build/
+
+# Vercel
+.vercel/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Logs y temporales
+*.log
+npm-debug.log*
+.env
+.env.local
+.vercel
+
+# Local Netlify folder
+.netlify

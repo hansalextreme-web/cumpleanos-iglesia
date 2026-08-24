@@ -1,0 +1,12 @@
+{
+  "name": "cumpleanos-iglesia",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "npx -y serve .",
+    "dev": "npx -y serve ."
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}

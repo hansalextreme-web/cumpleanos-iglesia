@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Cumpleaños – Aposento Alto</title>
+  <meta name="description" content="Directorio de cumpleaños de la Iglesia Cristiana Aposento Alto – Piedra Viva">
+  <meta name="theme-color" content="#e30613">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Cumpleaños">
+
+  <!-- Favicon SVG -->
+  <link rel="icon" type="image/svg+xml" href="icon-192.svg">
+  <link rel="apple-touch-icon" href="icon-192.svg">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+
+  <!-- SheetJS -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+
+    <!-- ══════════════ HEADER ══════════════ -->
+    <header class="header">
+      <div class="header__bar"></div>
+      <div class="header__inner">
+        <img src="logo.png" alt="Aposento Alto" class="header__logo">
+        <div class="header__verse">
+          <p><strong>Salmo 90:12</strong> — Enséñanos de tal modo a contar nuestros días, que traigamos al corazón sabiduría.</p>
+        </div>
+        <div class="header__auth" id="headerAuth">
+          <!-- Sin sesión -->
+          <button class="btn-login" id="btnLogin" title="Iniciar sesión como administrador">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+            <span>Ingresar</span>
+          </button>
+          <!-- Con sesión (oculto por defecto) -->
+          <div class="user-badge" id="userBadge" style="display:none">
+            <img class="user-badge__avatar" id="userAvatar" src="" alt="">
+            <div class="user-badge__info">
+              <span class="user-badge__name" id="userName"></span>
+              <span class="user-badge__role" id="userRole"></span>
+            </div>
+            <button class="user-badge__logout" id="btnLogout" title="Cerrar sesión">↩</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ══════════════ BANNER CUMPLEAÑOS ══════════════ -->
+    <div id="bannerCumple" class="banner-cumple" style="display:none">
+      <div class="banner-cumple__confetti" aria-hidden="true" id="confetti"></div>
+      <button class="banner-cumple__close" id="bannerClose" aria-label="Cerrar">✕</button>
+      <div class="banner-cumple__inner">
+        <div class="banner-cumple__emoji">🎂</div>
+        <div class="banner-cumple__texto">
+          <p class="banner-cumple__titulo">¡Hoy cumplen años!</p>
+          <div id="bannerNombres" class="banner-cumple__nombres"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ DASHBOARD ══════════════ -->
+    <section class="dashboard">
+      <div class="stat-card stat-card--clickable" id="card-total" title="Ver todos">
+        <span class="stat-card__label">Total miembros</span>
+        <span class="stat-card__number" id="totalMiembros">0</span>
+      </div>
+      <div class="stat-card stat-card--hoy stat-card--clickable" id="card-hoy" title="Ver cumpleaños de hoy">
+        <span class="stat-card__label">🎂 Hoy</span>
+        <span class="stat-card__number" id="hoy">0</span>
+      </div>
+      <div class="stat-card stat-card--clickable" id="card-este-mes" title="Ver este mes">
+        <span class="stat-card__label">Este mes</span>
+        <span class="stat-card__number" id="esteMes">0</span>
+      </div>
+      <div class="stat-card stat-card--clickable" id="card-proximos-7" title="Próximos 7 días">
+        <span class="stat-card__label">Próximos 7 días</span>
+        <span class="stat-card__number" id="proximos7">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-card__label">Próximo mes</span>
+        <span class="stat-card__number" id="proximoMes">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-card__label">Mes con más</span>
+        <span class="stat-card__number stat-card__number--sm" id="mesMas">—</span>
+      </div>
+    </section>
+
+    <!-- ══════════════ TOOLBAR ══════════════ -->
+    <div class="toolbar">
+      <div class="toolbar__search">
+        <span class="toolbar__search-icon">🔍</span>
+        <input type="text" id="buscador" placeholder="Buscar por nombre, profesión, fecha…">
+      </div>
+      <div class="toolbar__filters">
+        <select id="filtroMes">
+          <option value="0">Todos los meses</option>
+          <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+          <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+          <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+        </select>
+      </div>
+      <div class="toolbar__actions">
+        <button class="btn btn--primary solo-admin" id="btnNuevo" style="display:none">+ Agregar</button>
+        <button class="btn btn--outline solo-admin" id="btnImportar" style="display:none">⬆ Importar Excel</button>
+        <button class="btn btn--dark" id="btnExportar">⬇ Exportar CSV</button>
+        <input type="file" id="inputExcel" accept=".xlsx,.xls" style="display:none">
+      </div>
+    </div>
+
+    <!-- ══════════════ PROGRESS BAR ══════════════ -->
+    <div id="progressWrap" class="progress-wrap" style="display:none">
+      <p id="progressText" class="progress-wrap__text">Importando…</p>
+      <div class="progress-wrap__track"><div id="progressBar" class="progress-wrap__bar"></div></div>
+    </div>
+
+    <!-- ══════════════ LISTA ══════════════ -->
+    <main class="main">
+      <div id="emptyState" class="empty-state" style="display:none">
+        <p>😕 No se encontraron resultados.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="members-table" id="membersTable">
+          <thead>
+            <tr>
+              <th class="col-dias">Días</th>
+              <th>Nombre</th>
+              <th>Cumpleaños</th>
+              <th>Teléfono</th>
+              <th>Profesión</th>
+              <th class="col-acciones">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="cardsContainer"></tbody>
+        </table>
+      </div>
+      <!-- Vista móvil: cards -->
+      <div class="mobile-cards" id="mobileCards"></div>
+    </main>
+
+  </div><!-- /app -->
+
+  <!-- ══════════════ MODAL CRUD ══════════════ -->
+  <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" style="display:none">
+    <div class="modal__backdrop" id="modalBackdrop"></div>
+    <div class="modal__box">
+      <div class="modal__header">
+        <h2 class="modal__title" id="modalTitle">Agregar persona</h2>
+        <button class="modal__close" id="modalClose" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal__body">
+        <div class="form-grid">
+          <div class="form-field form-field--full">
+            <label for="fNombre">Nombre completo <span class="req">*</span></label>
+            <input type="text" id="fNombre" placeholder="Ej: María González" autocomplete="off">
+          </div>
+          <div class="form-field">
+            <label for="fDia">Día <span class="req">*</span></label>
+            <input type="number" id="fDia" min="1" max="31" placeholder="15">
+          </div>
+          <div class="form-field">
+            <label for="fMes">Mes <span class="req">*</span></label>
+            <select id="fMes">
+              <option value="">— Mes —</option>
+              <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+              <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+              <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+              <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="fAnio">Año</label>
+            <input type="number" id="fAnio" min="1920" max="2026" placeholder="1990">
+          </div>
+          <div class="form-field">
+            <label for="fTelefono">Teléfono</label>
+            <input type="text" id="fTelefono" placeholder="Ej: 3001234567">
+          </div>
+          <div class="form-field form-field--full">
+            <label for="fDireccion">Dirección</label>
+            <input type="text" id="fDireccion" placeholder="Ej: Calle 45 #12-30">
+          </div>
+          <div class="form-field">
+            <label for="fProfesion">Profesión</label>
+            <input type="text" id="fProfesion" placeholder="Ej: Ingeniero">
+          </div>
+          <div class="form-field form-field--full">
+            <label for="fCorreo">Correo electrónico</label>
+            <input type="email" id="fCorreo" placeholder="Ej: nombre@correo.com">
+          </div>
+        </div>
+        <p id="formError" class="form-error" style="display:none"></p>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--ghost" id="btnCancelar">Cancelar</button>
+        <button class="btn btn--primary" id="btnGuardar">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ TOAST ══════════════ -->
+  <div id="toast" class="toast" style="display:none"></div>
+
+  <!-- ══════════════ FOOTER ══════════════ -->
+  <footer class="footer">
+    <div class="footer__inner">
+      <span class="footer__logo">Iglesia Cristiana Aposento Alto</span>
+      <span class="footer__sep">·</span>
+      <span class="footer__version">v1.2.0</span>
+      <span class="footer__sep">·</span>
+      <span class="footer__copy">© 2026</span>
+    </div>
+  </footer>
+
+  <script type="module" src="index.js"></script>
+  <script>
+    // Registrar Service Worker para PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(() => console.log('SW registrado'))
+          .catch(err => console.warn('SW error:', err));
+      });
+    }
+  </script>
+</body>
+</html>

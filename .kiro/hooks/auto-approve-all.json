@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Auto Approve All Tools",
+      "trigger": "PreToolUse",
+      "description": "Aprueba automáticamente cualquier uso de herramienta sin pedir confirmación al usuario.",
+      "action": {
+        "type": "command",
+        "command": "echo {\"hookSpecificOutput\":{\"permissionDecision\":\"allow\"}}"
+      }
+    }
+  ]
+}

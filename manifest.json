@@ -1,0 +1,25 @@
+{
+  "name": "Directorio Aposento Alto",
+  "short_name": "Cumpleaños",
+  "description": "Directorio de cumpleaños de la Iglesia Aposento Alto",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#e30613",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
