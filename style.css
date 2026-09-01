@@ -740,6 +740,45 @@ button { font-family: inherit; cursor: pointer; border: none; font-weight: 600; 
   .toolbar__actions .btn span { display: none; } /* ocultar texto, dejar solo ícono */
 }
 
+/* ── Edición inline ──────────────────────────────────────────── */
+td.editable { position: relative; }
+
+/* Solo mostrar cursor y tooltip cuando el usuario es admin */
+body.is-admin td.editable { cursor: text; }
+body.is-admin td.editable:hover { background: rgba(227,6,19,.04); }
+
+body.is-admin td.editable::after {
+  content: '✎';
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: var(--gris-300);
+  opacity: 0;
+  transition: opacity var(--trans);
+  pointer-events: none;
+}
+body.is-admin td.editable:hover::after { opacity: 1; }
+
+.inline-input {
+  width: 100%;
+  padding: 4px 8px;
+  border: 2px solid var(--rojo);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  background: #fff;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(227,6,19,.12);
+  min-width: 120px;
+}
+.col-contacto .inline-input {
+  font-weight: 400;
+  font-size: 13px;
+}
+
 /* ── Footer ──────────────────────────────────────────────────── */
 .footer {
   background: var(--gris-50);
@@ -861,4 +900,119 @@ button { font-family: inherit; cursor: pointer; border: none; font-weight: 600; 
   .toast {
     bottom: calc(24px + env(safe-area-inset-bottom));
   }
+}
+
+/* ── Modal gestión de admins ─────────────────────────────────── */
+.modal__box--wide {
+  max-width: 600px;
+}
+
+.admins-list {
+  background: var(--gris-50);
+  border: 1px solid var(--gris-200);
+  border-radius: var(--radio);
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.admins-list__loading {
+  text-align: center;
+  color: var(--gris-500);
+  padding: 1rem;
+}
+
+.admin-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid var(--gris-200);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  transition: var(--trans);
+}
+
+.admin-item:last-child {
+  margin-bottom: 0;
+}
+
+.admin-item:hover {
+  border-color: var(--rojo);
+  box-shadow: var(--sombra-sm);
+}
+
+.admin-item__email {
+  font-size: 14px;
+  color: var(--texto);
+  font-weight: 500;
+  flex: 1;
+  word-break: break-all;
+}
+
+.admin-item__badge {
+  font-size: 11px;
+  color: var(--rojo);
+  background: var(--rojo-light);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  margin-left: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.admin-item__remove {
+  background: transparent;
+  border: none;
+  color: var(--gris-500);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: var(--trans);
+}
+
+.admin-item__remove:hover {
+  background: var(--peligro);
+  color: #fff;
+}
+
+.admin-form {
+  border-top: 1px solid var(--gris-200);
+  padding-top: 1.5rem;
+}
+
+.admin-form__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--texto);
+  margin-bottom: 0.75rem;
+}
+
+.admin-form__fields {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-form__input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--gris-300);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: var(--trans);
+}
+
+.admin-form__input:focus {
+  outline: none;
+  border-color: var(--rojo);
+  box-shadow: 0 0 0 3px var(--rojo-light);
+}
+
+.admin-form__input::placeholder {
+  color: var(--gris-500);
 }

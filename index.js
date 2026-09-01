@@ -114,6 +114,8 @@ function aplicarRol(admin) {
   esAdmin = admin;
   const btnsAdmin = document.querySelectorAll('.solo-admin');
   btnsAdmin.forEach(b => b.style.display = admin ? '' : 'none');
+  // Clase en body para CSS condicional (cursor editable, tooltip, etc.)
+  document.body.classList.toggle('is-admin', admin);
   const roleEl = el('userRole');
   if (roleEl) {
     roleEl.textContent = admin ? 'Administrador' : 'Solo lectura';
@@ -142,10 +144,20 @@ function iniciarAuth() {
     try {
       await signInWithPopup(auth, new GoogleAuthProvider());
     } catch (err) {
-      if (err.code !== 'auth/popup-closed-by-user') {
-        toast('❌ Error al iniciar sesión.');
-        console.error(err);
+      console.error('Auth error:', err.code, err.message);
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        return; // usuario cerró el popup — no es un error real
       }
+      // Mostrar mensaje específico según el código de error
+      const mensajes = {
+        'auth/popup-blocked':              '🔒 El navegador bloqueó el popup. Permite popups para este sitio.',
+        'auth/unauthorized-domain':        '🌐 Dominio no autorizado en Firebase. Agrégalo en Authentication → Dominios.',
+        'auth/operation-not-allowed':      '⚙️ Google Sign-in no está habilitado en Firebase.',
+        'auth/network-request-failed':     '📡 Sin conexión. Verifica tu internet.',
+        'auth/internal-error':             '⚠️ Error interno de Firebase. Intenta de nuevo.',
+      };
+      const msg = mensajes[err.code] || `❌ Error: ${err.code || err.message}`;
+      toast(msg, 6000);
     }
   });
 
@@ -366,15 +378,16 @@ function crearCardMovil(p, idx) {
       ${p.profesion ? `<span>💼 ${p.profesion}</span>` : ''}
       ${p.correo    ? `<span>✉️ ${p.correo}</span>`    : ''}
     </div>
+    ${esAdmin ? `
     <div class="m-card__actions">
-      ${esAdmin ? `
-        <button class="btn btn--sm btn--outline" data-action="editar"   data-idx="${idx}">✏️ Editar</button>
-        <button class="btn btn--sm btn--danger"  data-action="eliminar" data-idx="${idx}">🗑 Eliminar</button>
-      ` : ''}
-    </div>
+      <button class="btn btn--sm btn--outline" data-action="editar"   data-idx="${idx}">✏️ Editar</button>
+      <button class="btn btn--sm btn--danger"  data-action="eliminar" data-idx="${idx}">🗑 Eliminar</button>
+    </div>` : ''}
   `;
-  div.querySelector('[data-action="editar"]').addEventListener('click',   () => abrirModal(idx));
-  div.querySelector('[data-action="eliminar"]').addEventListener('click', () => confirmarEliminar(idx));
+  if (esAdmin) {
+    div.querySelector('[data-action="editar"]').addEventListener('click',   () => abrirModal(idx));
+    div.querySelector('[data-action="eliminar"]').addEventListener('click', () => confirmarEliminar(idx));
+  }
   return div;
 }
 
@@ -390,10 +403,10 @@ function crearFila(p, idx) {
   tr.className = esHoy ? 'row--hoy' : pronto ? 'row--pronto' : '';
   tr.innerHTML = `
     <td class="col-dias"><span class="dias-pill ${pillClass}">${pillText}</span></td>
-    <td class="col-nombre">${p.nombre}</td>
+    <td class="col-nombre editable" data-field="nombre"   data-idx="${idx}">${p.nombre}</td>
     <td>${fecha}</td>
-    <td class="col-contacto">${p.telefono || '—'}</td>
-    <td class="col-contacto">${p.profesion || '—'}</td>
+    <td class="col-contacto editable" data-field="telefono"  data-idx="${idx}">${p.telefono  || '—'}</td>
+    <td class="col-contacto editable" data-field="profesion" data-idx="${idx}">${p.profesion || '—'}</td>
     <td class="col-acciones">
       ${esAdmin ? `
         <button class="btn btn--sm btn--outline" data-action="editar"   data-idx="${idx}">✏️</button>
@@ -401,9 +414,98 @@ function crearFila(p, idx) {
       ` : '<span style="color:var(--gris-300);font-size:12px">—</span>'}
     </td>
   `;
-  tr.querySelector('[data-action="editar"]').addEventListener('click',   e => abrirModal(parseInt(e.currentTarget.dataset.idx, 10)));
-  tr.querySelector('[data-action="eliminar"]').addEventListener('click', e => confirmarEliminar(parseInt(e.currentTarget.dataset.idx, 10)));
+
+  if (esAdmin) {
+    tr.querySelector('[data-action="editar"]').addEventListener('click',   e => abrirModal(parseInt(e.currentTarget.dataset.idx, 10)));
+    tr.querySelector('[data-action="eliminar"]').addEventListener('click', e => confirmarEliminar(parseInt(e.currentTarget.dataset.idx, 10)));
+  }
   return tr;
+}
+
+// ─── Edición inline ───────────────────────────────────────────
+async function editarCeldaInline(celda, idx, campo) {
+  if (!esAdmin) return;
+  if (celda.querySelector('input')) return; // ya está editando
+
+  const persona     = personas[idx];
+  const valorActual = persona[campo] || '';
+  const esVacio     = valorActual === '—' || valorActual === '';
+
+  celda.innerHTML = `<input class="inline-input" value="${esVacio ? '' : valorActual}" placeholder="${campo}" />`;
+  const input = celda.querySelector('input');
+  input.focus();
+  input.select();
+
+  let guardado = false;
+
+  async function guardarCambio() {
+    if (guardado) return;
+    guardado = true;
+
+    const nuevoValor = input.value.trim() || null;
+    const sinCambio  = (nuevoValor || '') === (valorActual === '—' ? '' : valorActual);
+
+    if (sinCambio) {
+      celda.textContent = valorActual || '—';
+      return;
+    }
+
+    persona[campo]    = nuevoValor;
+    celda.textContent = nuevoValor || '—';
+
+    // Actualizar también la card móvil si existe
+    actualizarCardMovil(idx);
+
+    try {
+      await guardarEnFirestore(persona);
+      persistirLocal();
+      toast(`✏️ ${campo.charAt(0).toUpperCase() + campo.slice(1)} actualizado.`);
+    } catch (err) {
+      console.error(err);
+      // Revertir en caso de error
+      persona[campo]    = esVacio ? null : valorActual;
+      celda.textContent = valorActual || '—';
+      toast('❌ Error al guardar. Intenta de nuevo.');
+    }
+  }
+
+  input.addEventListener('blur', guardarCambio);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      input.blur();
+    }
+    if (e.key === 'Escape') {
+      guardado = true; // evitar que blur guarde
+      celda.textContent = valorActual || '—';
+    }
+  });
+}
+
+// Actualiza el texto de una card móvil sin re-renderizar toda la lista
+function actualizarCardMovil(idx) {
+  const p = personas[idx];
+  const mobile = el('mobileCards');
+  if (!mobile) return;
+  // Buscar la card que tenga un botón con este idx
+  const btn = mobile.querySelector(`[data-idx="${idx}"]`);
+  if (!btn) return;
+  const card = btn.closest('.m-card');
+  if (!card) return;
+  // Actualizar nombre
+  const nameEl = card.querySelector('.m-card__name');
+  if (nameEl) nameEl.textContent = p.nombre;
+  // Actualizar info
+  const infoEl = card.querySelector('.m-card__info');
+  if (infoEl) {
+    const fecha = p.anio ? `${p.dia} ${MESES[p.mes]} ${p.anio}` : `${p.dia} ${MESES[p.mes]}`;
+    infoEl.innerHTML = `
+      <span>🎂 ${fecha}</span>
+      ${p.telefono ? `<span>📞 ${p.telefono}</span>` : ''}
+      ${p.profesion ? `<span>💼 ${p.profesion}</span>` : ''}
+      ${p.correo    ? `<span>✉️ ${p.correo}</span>`    : ''}
+    `;
+  }
 }
 
 // ─── CRUD – Modal ─────────────────────────────────────────────
@@ -629,6 +731,112 @@ function exportarCSV() {
   toast('⬇ Archivo descargado.');
 }
 
+// ─── Gestión de administradores ───────────────────────────────
+async function abrirModalAdmins() {
+  el('modalAdmins').style.display = 'flex';
+  setTimeout(() => el('modalAdmins').classList.add('modal--visible'), 10);
+  el('nuevoAdminEmail').value = '';
+  el('adminFormError').style.display = 'none';
+  await cargarListaAdmins();
+}
+
+function cerrarModalAdmins() {
+  el('modalAdmins').classList.remove('modal--visible');
+  setTimeout(() => { el('modalAdmins').style.display = 'none'; }, 200);
+}
+
+async function cargarListaAdmins() {
+  const lista = el('adminsList');
+  lista.innerHTML = '<div class="admins-list__loading">⏳ Cargando administradores...</div>';
+  
+  try {
+    const snap = await getDocs(collection(db, COL_ADMINS));
+    const admins = snap.docs.map(d => d.id);
+    
+    if (admins.length === 0) {
+      lista.innerHTML = '<div class="admins-list__loading">No hay administradores registrados.</div>';
+      return;
+    }
+
+    const emailActual = auth.currentUser?.email;
+    lista.innerHTML = admins.map(email => `
+      <div class="admin-item">
+        <span class="admin-item__email">${email}</span>
+        ${email === emailActual ? '<span class="admin-item__badge">TÚ</span>' : ''}
+        ${email !== emailActual ? `<button class="admin-item__remove" data-email="${email}" title="Eliminar administrador">🗑</button>` : ''}
+      </div>
+    `).join('');
+
+    // Eventos para eliminar
+    lista.querySelectorAll('.admin-item__remove').forEach(btn => {
+      btn.addEventListener('click', () => eliminarAdmin(btn.dataset.email));
+    });
+
+  } catch (err) {
+    console.error('Error al cargar admins:', err);
+    lista.innerHTML = '<div class="admins-list__loading" style="color:var(--peligro)">❌ Error al cargar administradores.</div>';
+  }
+}
+
+async function agregarAdmin() {
+  const email = el('nuevoAdminEmail').value.trim().toLowerCase();
+  const errorEl = el('adminFormError');
+  
+  if (!email) {
+    errorEl.textContent = 'Ingresa un correo electrónico.';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errorEl.textContent = 'Ingresa un correo válido.';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  errorEl.style.display = 'none';
+  el('btnAgregarAdmin').disabled = true;
+  el('btnAgregarAdmin').textContent = '⏳ Agregando...';
+
+  try {
+    // Verificar si ya existe
+    const existe = await getDoc(doc(db, COL_ADMINS, email));
+    if (existe.exists()) {
+      errorEl.textContent = 'Este correo ya es administrador.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    // Agregar a Firestore
+    await setDoc(doc(db, COL_ADMINS, email), { rol: 'admin' });
+    
+    toast(`✅ ${email} agregado como administrador.`);
+    el('nuevoAdminEmail').value = '';
+    await cargarListaAdmins();
+
+  } catch (err) {
+    console.error('Error al agregar admin:', err);
+    errorEl.textContent = 'Error al agregar administrador. Revisa tu conexión.';
+    errorEl.style.display = 'block';
+  } finally {
+    el('btnAgregarAdmin').disabled = false;
+    el('btnAgregarAdmin').textContent = '+ Agregar';
+  }
+}
+
+async function eliminarAdmin(email) {
+  if (!confirm(`¿Eliminar a ${email} como administrador?\nEsta persona perderá acceso de escritura.`)) return;
+
+  try {
+    await deleteDoc(doc(db, COL_ADMINS, email));
+    toast(`🗑 ${email} eliminado de administradores.`);
+    await cargarListaAdmins();
+  } catch (err) {
+    console.error('Error al eliminar admin:', err);
+    toast('❌ Error al eliminar. Intenta de nuevo.');
+  }
+}
+
 // ─── Eventos ──────────────────────────────────────────────────
 function registrarEventos() {
   el('buscador').addEventListener('input',  () => { filtroActivo = null; renderizarLista(); });
@@ -654,6 +862,27 @@ function registrarEventos() {
     const f = e.target.files[0];
     if (f) importarExcel(f);
     e.target.value = '';
+  });
+
+  // Gestión de admins
+  el('btnGestionarAdmins').addEventListener('click', abrirModalAdmins);
+  el('btnAgregarAdmin').addEventListener('click', agregarAdmin);
+  el('btnCerrarAdmins').addEventListener('click', cerrarModalAdmins);
+  el('modalAdminsClose').addEventListener('click', cerrarModalAdmins);
+  el('modalAdminsBackdrop').addEventListener('click', cerrarModalAdmins);
+  el('modalAdmins').addEventListener('keydown', e => {
+    if (e.key === 'Escape') cerrarModalAdmins();
+    if (e.key === 'Enter' && e.target.id === 'nuevoAdminEmail') agregarAdmin();
+  });
+
+  // ── Edición inline delegada al tbody ──────────────────────────
+  // Se registra una vez aquí, funciona para todas las filas actuales y futuras.
+  // Verifica esAdmin en tiempo de ejecución, no en tiempo de creación.
+  el('cardsContainer').addEventListener('dblclick', e => {
+    if (!esAdmin) return;
+    const celda = e.target.closest('td.editable');
+    if (!celda) return;
+    editarCeldaInline(celda, parseInt(celda.dataset.idx, 10), celda.dataset.field);
   });
 
   el('btnGuardar').addEventListener('click',   guardar);
@@ -732,7 +961,7 @@ function ocultarProgreso() {
 }
 
 let _toastTimer = null;
-function toast(msg) {
+function toast(msg, duracion = 3500) {
   const t = el('toast');
   t.textContent = msg;
   t.style.display = 'block';
@@ -741,7 +970,7 @@ function toast(msg) {
   _toastTimer = setTimeout(() => {
     t.classList.remove('toast--visible');
     setTimeout(() => { t.style.display = 'none'; }, 300);
-  }, 3500);
+  }, duracion);
 }
 
 // ─── Helpers generales ────────────────────────────────────────

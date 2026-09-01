@@ -9,10 +9,11 @@ service cloud.firestore {
                       exists(/databases/$(database)/documents/admind/$(request.auth.token.email));
     }
 
-    // Colección de admins: solo lectura para usuarios autenticados
+    // Colección de admins: lectura para usuarios autenticados, escritura solo para admins existentes
     match /admind/{email} {
       allow read: if request.auth != null;
-      allow write: if false; // solo se gestiona desde Firebase Console
+      allow write: if request.auth != null &&
+                      exists(/databases/$(database)/documents/admind/$(request.auth.token.email));
     }
   }
 }

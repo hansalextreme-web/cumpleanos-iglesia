@@ -117,6 +117,7 @@
       <div class="toolbar__actions">
         <button class="btn btn--primary solo-admin" id="btnNuevo" style="display:none">+ Agregar</button>
         <button class="btn btn--outline solo-admin" id="btnImportar" style="display:none">⬆ Importar Excel</button>
+        <button class="btn btn--outline solo-admin" id="btnGestionarAdmins" style="display:none">👥 Gestionar admins</button>
         <button class="btn btn--dark" id="btnExportar">⬇ Exportar CSV</button>
         <input type="file" id="inputExcel" accept=".xlsx,.xls" style="display:none">
       </div>
@@ -208,6 +209,46 @@
       <div class="modal__footer">
         <button class="btn btn--ghost" id="btnCancelar">Cancelar</button>
         <button class="btn btn--primary" id="btnGuardar">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ MODAL GESTIÓN ADMINS ══════════════ -->
+  <div id="modalAdmins" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalAdminsTitle" style="display:none">
+    <div class="modal__backdrop" id="modalAdminsBackdrop"></div>
+    <div class="modal__box modal__box--wide">
+      <div class="modal__header">
+        <h2 class="modal__title" id="modalAdminsTitle">👥 Gestionar administradores</h2>
+        <button class="modal__close" id="modalAdminsClose" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal__body">
+        <p style="color:var(--gris-500);margin-bottom:1rem;font-size:14px">
+          Los administradores pueden editar, agregar y eliminar miembros. Los usuarios no autorizados tienen acceso de solo lectura.
+        </p>
+        
+        <!-- Lista de admins actuales -->
+        <div class="admins-list" id="adminsList">
+          <div class="admins-list__loading">⏳ Cargando administradores...</div>
+        </div>
+
+        <!-- Formulario para agregar nuevo admin -->
+        <div class="admin-form">
+          <h3 class="admin-form__title">Agregar nuevo administrador</h3>
+          <div class="admin-form__fields">
+            <input 
+              type="email" 
+              id="nuevoAdminEmail" 
+              placeholder="correo@ejemplo.com"
+              autocomplete="off"
+              class="admin-form__input"
+            >
+            <button class="btn btn--primary" id="btnAgregarAdmin">+ Agregar</button>
+          </div>
+          <p id="adminFormError" class="form-error" style="display:none"></p>
+        </div>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--ghost" id="btnCerrarAdmins">Cerrar</button>
       </div>
     </div>
   </div>
