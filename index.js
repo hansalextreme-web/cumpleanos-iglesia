@@ -261,9 +261,12 @@ function ordenar() {
 
 // ─── Dashboard ────────────────────────────────────────────────
 function actualizarDashboard(lista = personas) {
+  // Usar fecha local del usuario (no UTC) para evitar desfasajes de zona horaria
   const hoy  = new Date();
   const dHoy = hoy.getDate();
-  const mHoy = hoy.getMonth() + 1;
+  const mHoy = hoy.getMonth() + 1; // getMonth() devuelve 0-11, sumamos 1 para obtener 1-12
+  
+  // Calcular el próximo mes correctamente, manejando diciembre (12 → 1)
   const mSig = mHoy === 12 ? 1 : mHoy + 1;
 
   const contHoy    = lista.filter(p => p.dia === dHoy && p.mes === mHoy).length;
@@ -285,11 +288,20 @@ function actualizarDashboard(lista = personas) {
 }
 
 function diasHasta(p) {
+  // Usar fecha local para calcular días restantes correctamente
   const hoy  = new Date();
-  let bday   = new Date(hoy.getFullYear(), p.mes - 1, p.dia);
-  if (bday < hoy && !(p.dia === hoy.getDate() && p.mes === hoy.getMonth() + 1)) {
+  hoy.setHours(0, 0, 0, 0); // Normalizar a medianoche para comparación exacta
+  
+  // Crear fecha de cumpleaños del año actual
+  let bday = new Date(hoy.getFullYear(), p.mes - 1, p.dia);
+  bday.setHours(0, 0, 0, 0);
+  
+  // Si el cumpleaños ya pasó este año, calcular para el año siguiente
+  if (bday < hoy) {
     bday.setFullYear(hoy.getFullYear() + 1);
   }
+  
+  // Calcular diferencia en días
   return Math.round((bday - hoy) / 86400000);
 }
 
