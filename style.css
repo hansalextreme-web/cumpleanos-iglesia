@@ -1016,3 +1016,23 @@ body.is-admin td.editable:hover::after { opacity: 1; }
 .admin-form__input::placeholder {
   color: var(--gris-500);
 }
+
+/* ── Tarjeta dinámica próximo cumpleaños ─────────────────────── */
+.stat-card__sub {
+  font-size: 11px;
+  color: var(--gris-500);
+  margin-top: 2px;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.stat-card--proximo {
+  background: linear-gradient(135deg, #fff 60%, var(--rojo-light));
+}
+
+.stat-card--proximo:hover {
+  border-color: var(--rojo);
+}

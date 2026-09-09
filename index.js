@@ -265,14 +265,10 @@ function actualizarDashboard(lista = personas) {
   const hoy  = new Date();
   const dHoy = hoy.getDate();
   const mHoy = hoy.getMonth() + 1; // getMonth() devuelve 0-11, sumamos 1 para obtener 1-12
-  
-  // Calcular el próximo mes correctamente, manejando diciembre (12 → 1)
-  const mSig = mHoy === 12 ? 1 : mHoy + 1;
 
   const contHoy    = lista.filter(p => p.dia === dHoy && p.mes === mHoy).length;
   const contMes    = lista.filter(p => p.mes === mHoy).length;
   const contProx7  = lista.filter(p => diasHasta(p) >= 0 && diasHasta(p) <= 7).length;
-  const contSigMes = lista.filter(p => p.mes === mSig).length;
 
   const cnt = Array(13).fill(0);
   personas.forEach(p => { if (p.mes >= 1 && p.mes <= 12) cnt[p.mes]++; });
@@ -283,11 +279,55 @@ function actualizarDashboard(lista = personas) {
   setText('hoy',           contHoy);
   setText('esteMes',       contMes);
   setText('proximos7',     contProx7);
-  setText('proximoMes',    contSigMes);
   setText('mesMas',        max > 0 ? MESES[idxMax] : '—');
+
+  // ── Tarjeta dinámica: próximo cumpleaños ──────────────────────
+  actualizarProximoCumple();
 }
 
-function diasHasta(p) {
+function actualizarProximoCumple() {
+  if (!personas.length) return;
+
+  const hoy  = new Date();
+  const dHoy = hoy.getDate();
+  const mHoy = hoy.getMonth() + 1;
+
+  // Ordenar todos por días restantes (de menor a mayor)
+  const ordenados = [...personas]
+    .map(p => ({ ...p, dias: diasHasta(p) }))
+    .sort((a, b) => a.dias - b.dias);
+
+  // ¿Hay alguien que cumpla HOY?
+  const cumpleHoy = ordenados.filter(p => p.dia === dHoy && p.mes === mHoy);
+
+  const labelEl  = document.getElementById('proximoLabel');
+  const nombreEl = document.getElementById('proximoNombre');
+  const diasEl   = document.getElementById('proximoDias');
+
+  if (cumpleHoy.length > 0) {
+    // Caso 1: cumpleaños HOY
+    const nombres = cumpleHoy.map(p => p.nombre.split(' ')[0]).join(' · ');
+    labelEl.textContent  = '🎂 Hoy cumple años';
+    nombreEl.textContent = nombres;
+    diasEl.textContent   = cumpleHoy.length > 1 ? `${cumpleHoy.length} personas` : '';
+    nombreEl.style.color = 'var(--rojo)';
+  } else {
+    // Caso 2: el próximo más cercano
+    const proximo = ordenados[0];
+    if (!proximo) return;
+
+    const dias    = proximo.dias;
+    const nombre  = proximo.nombre.split(' ').slice(0, 2).join(' '); // Nombre + primer apellido
+    const fecha   = `${proximo.dia} ${MESES[proximo.mes]}`;
+
+    labelEl.textContent  = 'Próximo cumpleaños';
+    nombreEl.textContent = nombre;
+    diasEl.textContent   = dias === 1 ? `Mañana · ${fecha}` : `En ${dias} días · ${fecha}`;
+    nombreEl.style.color = '';
+  }
+}
+
+
   // Usar fecha local para calcular días restantes correctamente
   const hoy  = new Date();
   hoy.setHours(0, 0, 0, 0); // Normalizar a medianoche para comparación exacta
@@ -864,6 +904,11 @@ function registrarEventos() {
     filtroActivo = null; el('filtroMes').value = String(new Date().getMonth() + 1); el('buscador').value = ''; renderizarLista();
   });
   el('card-proximos-7').addEventListener('click', () => {
+    filtroActivo = 'proximos7'; el('filtroMes').value = '0'; el('buscador').value = ''; renderizarLista();
+  });
+
+  // Tarjeta próximo cumpleaños → filtra próximos 7 días
+  el('card-proximo-cumple').addEventListener('click', () => {
     filtroActivo = 'proximos7'; el('filtroMes').value = '0'; el('buscador').value = ''; renderizarLista();
   });
 
