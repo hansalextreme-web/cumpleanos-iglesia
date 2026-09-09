@@ -327,20 +327,20 @@ function actualizarProximoCumple() {
   }
 }
 
-
+function diasHasta(p) {
   // Usar fecha local para calcular días restantes correctamente
   const hoy  = new Date();
   hoy.setHours(0, 0, 0, 0); // Normalizar a medianoche para comparación exacta
-  
+
   // Crear fecha de cumpleaños del año actual
   let bday = new Date(hoy.getFullYear(), p.mes - 1, p.dia);
   bday.setHours(0, 0, 0, 0);
-  
+
   // Si el cumpleaños ya pasó este año, calcular para el año siguiente
   if (bday < hoy) {
     bday.setFullYear(hoy.getFullYear() + 1);
   }
-  
+
   // Calcular diferencia en días
   return Math.round((bday - hoy) / 86400000);
 }
