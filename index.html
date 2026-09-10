@@ -215,6 +215,50 @@
     </div>
   </div>
 
+  <!-- ══════════════ MODAL DETALLE CONTACTO ══════════════ -->
+  <div id="modalDetalle" class="modal" role="dialog" aria-modal="true" aria-labelledby="detalleTitulo" style="display:none">
+    <div class="modal__backdrop" id="modalDetalleBackdrop"></div>
+    <div class="modal__box modal__box--detalle">
+      <div class="modal__header">
+        <h2 class="modal__title" id="detalleTitulo">Detalles del contacto</h2>
+        <button class="modal__close" id="modalDetalleClose" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal__body">
+        <div class="detalle-avatar" id="detalleAvatar"></div>
+        <div class="detalle-grid">
+          <div class="detalle-item" id="detalleNombreWrap">
+            <span class="detalle-item__icon">👤</span>
+            <div><span class="detalle-item__label">Nombre</span><span class="detalle-item__val" id="detalleNombre"></span></div>
+          </div>
+          <div class="detalle-item" id="detalleFechaWrap">
+            <span class="detalle-item__icon">🎂</span>
+            <div><span class="detalle-item__label">Cumpleaños</span><span class="detalle-item__val" id="detalleFecha"></span></div>
+          </div>
+          <div class="detalle-item" id="detalleTelWrap">
+            <span class="detalle-item__icon">📞</span>
+            <div><span class="detalle-item__label">Teléfono</span><span class="detalle-item__val" id="detalleTel"></span></div>
+          </div>
+          <div class="detalle-item" id="detalleCorreoWrap">
+            <span class="detalle-item__icon">✉️</span>
+            <div><span class="detalle-item__label">Correo</span><span class="detalle-item__val" id="detalleCorreo"></span></div>
+          </div>
+          <div class="detalle-item" id="detalleProfWrap">
+            <span class="detalle-item__icon">💼</span>
+            <div><span class="detalle-item__label">Profesión</span><span class="detalle-item__val" id="detalleProf"></span></div>
+          </div>
+          <div class="detalle-item detalle-item--full" id="detalleDirWrap">
+            <span class="detalle-item__icon">📍</span>
+            <div><span class="detalle-item__label">Dirección</span><span class="detalle-item__val" id="detalleDir"></span></div>
+          </div>
+        </div>
+        <div class="detalle-dias" id="detalleDias"></div>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--ghost" id="btnCerrarDetalle">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ══════════════ MODAL GESTIÓN ADMINS ══════════════ -->
   <div id="modalAdmins" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalAdminsTitle" style="display:none">
     <div class="modal__backdrop" id="modalAdminsBackdrop"></div>
@@ -263,7 +307,7 @@
     <div class="footer__inner">
       <span class="footer__logo">Iglesia Cristiana Aposento Alto</span>
       <span class="footer__sep">·</span>
-      <span class="footer__version">v1.3.0</span>
+      <span class="footer__version">v1.4.0</span>
       <span class="footer__sep">·</span>
       <span class="footer__copy">© 2026</span>
     </div>

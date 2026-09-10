@@ -430,6 +430,7 @@ function crearCardMovil(p, idx) {
       ${p.telefono ? `<span>📞 ${p.telefono}</span>` : ''}
       ${p.profesion ? `<span>💼 ${p.profesion}</span>` : ''}
       ${p.correo    ? `<span>✉️ ${p.correo}</span>`    : ''}
+      ${p.direccion ? `<span>📍 ${p.direccion}</span>` : ''}
     </div>
     ${esAdmin ? `
     <div class="m-card__actions">
@@ -461,13 +462,15 @@ function crearFila(p, idx) {
     <td class="col-contacto editable" data-field="telefono"  data-idx="${idx}">${p.telefono  || '—'}</td>
     <td class="col-contacto editable" data-field="profesion" data-idx="${idx}">${p.profesion || '—'}</td>
     <td class="col-acciones">
+      <button class="btn-detalle" data-action="detalle" data-idx="${idx}" title="Ver detalles">👁</button>
       ${esAdmin ? `
         <button class="btn btn--sm btn--outline" data-action="editar"   data-idx="${idx}">✏️</button>
         <button class="btn btn--sm btn--danger"  data-action="eliminar" data-idx="${idx}">🗑</button>
-      ` : '<span style="color:var(--gris-300);font-size:12px">—</span>'}
+      ` : ''}
     </td>
   `;
 
+  tr.querySelector('[data-action="detalle"]').addEventListener('click', e => abrirDetalle(parseInt(e.currentTarget.dataset.idx, 10)));
   if (esAdmin) {
     tr.querySelector('[data-action="editar"]').addEventListener('click',   e => abrirModal(parseInt(e.currentTarget.dataset.idx, 10)));
     tr.querySelector('[data-action="eliminar"]').addEventListener('click', e => confirmarEliminar(parseInt(e.currentTarget.dataset.idx, 10)));
@@ -784,7 +787,59 @@ function exportarCSV() {
   toast('⬇ Archivo descargado.');
 }
 
-// ─── Gestión de administradores ───────────────────────────────
+// ─── Modal de detalles del contacto ──────────────────────────
+function abrirDetalle(idx) {
+  const p    = personas[idx];
+  const dias = diasHasta(p);
+  const fecha = p.anio
+    ? `${p.dia} ${MESES[p.mes]} ${p.anio}`
+    : `${p.dia} ${MESES[p.mes]}`;
+
+  // Avatar con inicial
+  const inicial = (p.nombre || '?')[0].toUpperCase();
+  el('detalleAvatar').textContent  = inicial;
+
+  // Campos
+  el('detalleTitulo').textContent  = p.nombre;
+  el('detalleNombre').textContent  = p.nombre;
+  el('detalleFecha').textContent   = fecha;
+  el('detalleTel').textContent     = p.telefono  || '—';
+  el('detalleCorreo').textContent  = p.correo    || '—';
+  el('detalleProf').textContent    = p.profesion || '—';
+  el('detalleDir').textContent     = p.direccion || '—';
+
+  // Ocultar filas sin datos
+  el('detalleTelWrap').style.display    = p.telefono  ? '' : 'none';
+  el('detalleCorreoWrap').style.display = p.correo    ? '' : 'none';
+  el('detalleProfWrap').style.display   = p.profesion ? '' : 'none';
+  el('detalleDirWrap').style.display    = p.direccion ? '' : 'none';
+
+  // Contador de días
+  const diasEl = el('detalleDias');
+  if (dias === 0) {
+    diasEl.textContent  = '🎉 ¡Hoy cumple años!';
+    diasEl.className    = 'detalle-dias detalle-dias--hoy';
+  } else if (dias === 1) {
+    diasEl.textContent  = '🎂 ¡Mañana cumple años!';
+    diasEl.className    = 'detalle-dias detalle-dias--pronto';
+  } else if (dias <= 7) {
+    diasEl.textContent  = `🎂 Cumple en ${dias} días`;
+    diasEl.className    = 'detalle-dias detalle-dias--pronto';
+  } else {
+    diasEl.textContent  = `📅 Cumple en ${dias} días`;
+    diasEl.className    = 'detalle-dias';
+  }
+
+  el('modalDetalle').style.display = 'flex';
+  setTimeout(() => el('modalDetalle').classList.add('modal--visible'), 10);
+}
+
+function cerrarDetalle() {
+  el('modalDetalle').classList.remove('modal--visible');
+  setTimeout(() => { el('modalDetalle').style.display = 'none'; }, 200);
+}
+
+
 async function abrirModalAdmins() {
   el('modalAdmins').style.display = 'flex';
   setTimeout(() => el('modalAdmins').classList.add('modal--visible'), 10);
@@ -921,6 +976,12 @@ function registrarEventos() {
     if (f) importarExcel(f);
     e.target.value = '';
   });
+
+  // Detalle contacto
+  el('btnCerrarDetalle').addEventListener('click',    cerrarDetalle);
+  el('modalDetalleClose').addEventListener('click',   cerrarDetalle);
+  el('modalDetalleBackdrop').addEventListener('click',cerrarDetalle);
+  el('modalDetalle').addEventListener('keydown', e => { if (e.key === 'Escape') cerrarDetalle(); });
 
   // Gestión de admins
   el('btnGestionarAdmins').addEventListener('click', abrirModalAdmins);
