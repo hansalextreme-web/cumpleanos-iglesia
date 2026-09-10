@@ -59,14 +59,17 @@
     </header>
 
     <!-- ══════════════ BANNER CUMPLEAÑOS ══════════════ -->
-    <div id="bannerCumple" class="banner-cumple" style="display:none">
+    <div id="bannerCumple" class="banner-cumple" style="display:none" role="alert" aria-live="polite">
       <div class="banner-cumple__confetti" aria-hidden="true" id="confetti"></div>
-      <button class="banner-cumple__close" id="bannerClose" aria-label="Cerrar">✕</button>
+      <button class="banner-cumple__close" id="bannerClose" aria-label="Cerrar banner">✕</button>
       <div class="banner-cumple__inner">
-        <div class="banner-cumple__emoji">🎂</div>
-        <div class="banner-cumple__texto">
-          <p class="banner-cumple__titulo">¡Hoy cumplen años!</p>
-          <div id="bannerNombres" class="banner-cumple__nombres"></div>
+        <div class="banner-cumple__left">
+          <div class="banner-cumple__emoji" aria-hidden="true">🎂</div>
+        </div>
+        <div class="banner-cumple__content">
+          <p class="banner-cumple__titulo">¡Hoy es su día especial!</p>
+          <p class="banner-cumple__subtitulo" id="bannerSubtitulo"></p>
+          <div id="bannerPersonas" class="banner-cumple__personas"></div>
         </div>
       </div>
     </div>
@@ -307,7 +310,7 @@
     <div class="footer__inner">
       <span class="footer__logo">Iglesia Cristiana Aposento Alto</span>
       <span class="footer__sep">·</span>
-      <span class="footer__version">v1.5.0</span>
+      <span class="footer__version">v1.6.0</span>
       <span class="footer__sep">·</span>
       <span class="footer__copy">© 2026</span>
     </div>

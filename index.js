@@ -54,27 +54,46 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // ─── Banner de cumpleaños ─────────────────────────────────────
 function mostrarBannerCumpleanos() {
-  const hoy   = new Date();
-  const dHoy  = hoy.getDate();
-  const mHoy  = hoy.getMonth() + 1;
+  const hoy  = new Date();
+  const dHoy = hoy.getDate();
+  const mHoy = hoy.getMonth() + 1;
 
   const cumpleHoy = personas.filter(p => p.dia === dHoy && p.mes === mHoy);
   if (cumpleHoy.length === 0) return;
 
-  // Mostrar nombres
-  const contenedor = el('bannerNombres');
-  contenedor.innerHTML = cumpleHoy.map(p =>
-    `<span class="banner-cumple__chip">🎉 ${p.nombre}</span>`
-  ).join('');
+  // Subtítulo según cuántos cumplen
+  const subtitulo = cumpleHoy.length === 1
+    ? '🎉 ¡Un miembro celebra su cumpleaños hoy!'
+    : `🎉 ¡${cumpleHoy.length} miembros celebran su cumpleaños hoy!`;
+  el('bannerSubtitulo').textContent = subtitulo;
 
-  // Mostrar banner
+  // Tarjetas individuales por persona
+  const contenedor = el('bannerPersonas');
+  contenedor.innerHTML = cumpleHoy.map(p => {
+    const inicial  = (p.nombre || '?')[0].toUpperCase();
+    const edad     = p.anio ? `${hoy.getFullYear() - p.anio} años` : '';
+    const tel      = p.telefono  ? `<span class="bcumple-card__dato">📞 ${p.telefono}</span>`  : '';
+    const prof     = p.profesion ? `<span class="bcumple-card__dato">💼 ${p.profesion}</span>` : '';
+    return `
+      <div class="bcumple-card">
+        <div class="bcumple-card__avatar">${inicial}</div>
+        <div class="bcumple-card__info">
+          <span class="bcumple-card__nombre">${p.nombre}</span>
+          ${edad ? `<span class="bcumple-card__edad">🎈 ${edad}</span>` : ''}
+          <div class="bcumple-card__datos">${tel}${prof}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Mostrar banner con animación
   const banner = el('bannerCumple');
   banner.style.display = 'block';
 
   // Botón cerrar
   el('bannerClose').addEventListener('click', () => {
     banner.style.opacity = '0';
-    banner.style.transition = 'opacity .3s ease';
+    banner.style.transform = 'translateY(-10px)';
+    banner.style.transition = 'opacity .3s ease, transform .3s ease';
     setTimeout(() => { banner.style.display = 'none'; }, 300);
   });
 
