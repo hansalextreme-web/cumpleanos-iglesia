@@ -280,6 +280,7 @@ function actualizarDashboard(lista = personas) {
   setText('esteMes',       contMes);
   setText('proximos7',     contProx7);
   setText('mesMas',        max > 0 ? MESES[idxMax] : '—');
+  setText('mesMasCnt',     max > 0 ? `${max} cumpleaños` : '');
 
   // ── Tarjeta dinámica: próximo cumpleaños ──────────────────────
   actualizarProximoCumple();
