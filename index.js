@@ -46,6 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   completarBarraCarga();
   mostrarBannerCumpleanos();
   actualizarFaviconDinamico(); // 🎂 si hay cumpleaños hoy
+  actualizarBadgePWA();        // 🔴 badge nativo en ícono PWA
   el('filtroMes').value = String(new Date().getMonth() + 1);
   renderizarLista();
   actualizarDashboard();
@@ -122,6 +123,21 @@ function generarConfetti() {
   }
 }
 
+
+// ─── Badge nativo PWA ────────────────────────────────────────
+function actualizarBadgePWA() {
+  const hoy       = new Date();
+  const cumpleHoy = personas.filter(p => p.dia === hoy.getDate() && p.mes === hoy.getMonth() + 1);
+
+  // Web App Badging API — Chrome Android 81+, Windows Chrome/Edge
+  if ('setAppBadge' in navigator) {
+    if (cumpleHoy.length > 0) {
+      navigator.setAppBadge(cumpleHoy.length).catch(() => {});
+    } else {
+      navigator.clearAppBadge().catch(() => {});
+    }
+  }
+}
 
 // ─── Favicon dinámico ────────────────────────────────────────
 function actualizarFaviconDinamico() {
