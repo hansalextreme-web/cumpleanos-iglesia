@@ -323,6 +323,7 @@ function actualizarDashboard(lista = personas) {
   setText('hoy',           contHoy);
   setText('esteMes',       contMes);
   setText('proximos7',     contProx7);
+  setText('proximos7Sub',  contProx7 === 1 ? 'cumpleaños próximo' : contProx7 > 1 ? 'cumpleaños próximos' : '');
   setText('mesMas',        max > 0 ? MESES[idxMax] : '—');
   setText('mesMasCnt',     max > 0 ? `${max} cumpleaños` : '');
 
@@ -350,11 +351,10 @@ function actualizarProximoCumple() {
   const diasEl   = document.getElementById('proximoDias');
 
   if (cumpleHoy.length > 0) {
-    // Caso 1: cumpleaños HOY
     const nombres = cumpleHoy.map(p => p.nombre.split(' ')[0]).join(' · ');
-    labelEl.textContent  = '🎂 Hoy cumple años';
+    labelEl.textContent  = '🎂 ¡Hoy es su día!';
     nombreEl.textContent = nombres;
-    diasEl.textContent   = cumpleHoy.length > 1 ? `${cumpleHoy.length} personas` : '';
+    diasEl.textContent   = cumpleHoy.length > 1 ? `${cumpleHoy.length} personas · ¡Felicítalas hoy 💛!` : '¡Felicítala hoy 💛!';
     nombreEl.style.color = 'var(--rojo)';
   } else {
     // Caso 2: el próximo más cercano
