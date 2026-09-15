@@ -8,5 +8,8 @@
   },
   "dependencies": {
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "jimp": "^0.22.12"
   }
 }
