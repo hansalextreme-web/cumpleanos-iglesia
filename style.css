@@ -1543,3 +1543,147 @@ body.is-admin td.editable:hover::after { opacity: 1; }
     width: calc(100% - 24px);
   }
 }
+
+/* ── Tabs del modal admin ─────────────────────────────────────── */
+.admin-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--gris-200);
+  padding: 0 22px;
+  gap: 4px;
+}
+
+.admin-tab {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gris-500);
+  cursor: pointer;
+  transition: color var(--trans), border-color var(--trans);
+  white-space: nowrap;
+}
+
+.admin-tab:hover {
+  color: var(--texto);
+}
+
+.admin-tab--active {
+  color: var(--rojo);
+  border-bottom-color: var(--rojo);
+}
+
+/* ── Lista de usuarios ────────────────────────────────────────── */
+.usuario-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid var(--gris-200);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  transition: var(--trans);
+}
+
+.usuario-item:last-child { margin-bottom: 0; }
+
+.usuario-item--admin {
+  border-color: rgba(227,6,19,.25);
+  background: #fff8f8;
+}
+
+.usuario-item:hover {
+  box-shadow: var(--sombra-sm);
+  border-color: var(--gris-300);
+}
+
+.usuario-item__avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--rojo-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--rojo);
+  border: 2px solid var(--gris-200);
+}
+
+.usuario-item__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.usuario-item__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.usuario-item__nombre {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--texto);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.usuario-item__email {
+  font-size: 12px;
+  color: var(--gris-500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.usuario-item__fecha {
+  font-size: 11px;
+  color: var(--gris-500);
+}
+
+.usuario-item__acciones {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.usuario-item__badge--admin {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--rojo);
+  background: var(--rojo-light);
+  border: 1px solid rgba(227,6,19,.2);
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+.usuario-item__badge--tu {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gris-500);
+  background: var(--gris-100);
+  border: 1px solid var(--gris-200);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+@media (max-width: 640px) {
+  .admin-tabs { padding: 0 16px; }
+  .admin-tab  { padding: 10px 12px; font-size: 13px; }
+  .usuario-item { flex-wrap: wrap; }
+  .usuario-item__acciones { width: 100%; justify-content: flex-end; }
+}

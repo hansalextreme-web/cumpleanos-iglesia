@@ -267,34 +267,46 @@
     <div class="modal__backdrop" id="modalAdminsBackdrop"></div>
     <div class="modal__box modal__box--wide">
       <div class="modal__header">
-        <h2 class="modal__title" id="modalAdminsTitle">👥 Gestionar administradores</h2>
+        <h2 class="modal__title" id="modalAdminsTitle">👥 Gestionar usuarios</h2>
         <button class="modal__close" id="modalAdminsClose" aria-label="Cerrar">✕</button>
       </div>
+
+      <!-- Tabs -->
+      <div class="admin-tabs">
+        <button class="admin-tab admin-tab--active" data-tab="usuarios">👤 Usuarios</button>
+        <button class="admin-tab" data-tab="admins">🛡 Administradores</button>
+      </div>
+
       <div class="modal__body">
-        <p style="color:var(--gris-500);margin-bottom:1rem;font-size:14px">
-          Los administradores pueden editar, agregar y eliminar miembros. Los usuarios no autorizados tienen acceso de solo lectura.
-        </p>
-        
-        <!-- Lista de admins actuales -->
-        <div class="admins-list" id="adminsList">
-          <div class="admins-list__loading">⏳ Cargando administradores...</div>
+
+        <!-- ── Panel Usuarios ── -->
+        <div id="panelUsuarios">
+          <p style="color:var(--gris-500);margin-bottom:1rem;font-size:13px">
+            Todos los usuarios que han iniciado sesión en la app. Puedes promover o degradar sus permisos.
+          </p>
+          <div class="admins-list" id="usuariosList">
+            <div class="admins-list__loading">⏳ Cargando usuarios...</div>
+          </div>
         </div>
 
-        <!-- Formulario para agregar nuevo admin -->
-        <div class="admin-form">
-          <h3 class="admin-form__title">Agregar nuevo administrador</h3>
-          <div class="admin-form__fields">
-            <input 
-              type="email" 
-              id="nuevoAdminEmail" 
-              placeholder="correo@ejemplo.com"
-              autocomplete="off"
-              class="admin-form__input"
-            >
-            <button class="btn btn--primary" id="btnAgregarAdmin">+ Agregar</button>
+        <!-- ── Panel Administradores ── -->
+        <div id="panelAdmins" style="display:none">
+          <p style="color:var(--gris-500);margin-bottom:1rem;font-size:13px">
+            Los administradores pueden editar, agregar y eliminar miembros.
+          </p>
+          <div class="admins-list" id="adminsList">
+            <div class="admins-list__loading">⏳ Cargando administradores...</div>
           </div>
-          <p id="adminFormError" class="form-error" style="display:none"></p>
+          <div class="admin-form">
+            <h3 class="admin-form__title">Agregar por correo</h3>
+            <div class="admin-form__fields">
+              <input type="email" id="nuevoAdminEmail" placeholder="correo@ejemplo.com" autocomplete="off" class="admin-form__input">
+              <button class="btn btn--primary" id="btnAgregarAdmin">+ Agregar</button>
+            </div>
+            <p id="adminFormError" class="form-error" style="display:none"></p>
+          </div>
         </div>
+
       </div>
       <div class="modal__footer">
         <button class="btn btn--ghost" id="btnCerrarAdmins">Cerrar</button>
@@ -322,7 +334,7 @@
     <div class="footer__inner">
       <span class="footer__logo">Iglesia Cristiana Aposento Alto</span>
       <span class="footer__sep">·</span>
-      <span class="footer__version">v1.7.0</span>
+      <span class="footer__version">v1.8.0</span>
       <span class="footer__sep">·</span>
       <span class="footer__copy">© 2026</span>
     </div>

@@ -175,6 +175,8 @@ function iniciarAuth() {
       el('userName').textContent    = usuario.displayName || usuario.email;
       el('userAvatar').src          = usuario.photoURL || '';
       aplicarRol(admin);
+      // Registrar/actualizar acceso en Firestore
+      registrarAcceso(usuario, admin);
     } else {
       el('btnLogin').style.display  = '';
       el('userBadge').style.display = 'none';
@@ -881,18 +883,125 @@ function cerrarDetalle() {
   setTimeout(() => { el('modalDetalle').style.display = 'none'; }, 200);
 }
 
+// ─── Registro de accesos ──────────────────────────────────────
+async function registrarAcceso(usuario, esAdmin) {
+  try {
+    await setDoc(doc(db, 'usuarios', usuario.uid), {
+      email:        usuario.email,
+      nombre:       usuario.displayName || '',
+      foto:         usuario.photoURL    || '',
+      esAdmin:      esAdmin,
+      ultimoAcceso: new Date().toISOString(),
+    }, { merge: true });
+  } catch (err) {
+    console.warn('No se pudo registrar acceso:', err.message);
+  }
+}
+
+// ─── Gestión de usuarios (panel admin) ────────────────────────
+async function cargarListaUsuarios() {
+  const lista = el('usuariosList');
+  lista.innerHTML = '<div class="admins-list__loading">⏳ Cargando usuarios...</div>';
+
+  try {
+    const [snapUsuarios, snapAdmins] = await Promise.all([
+      getDocs(collection(db, 'usuarios')),
+      getDocs(collection(db, 'admind'))
+    ]);
+
+    const adminsSet = new Set(snapAdmins.docs.map(d => d.id));
+    const usuarios  = snapUsuarios.docs.map(d => ({ uid: d.id, ...d.data() }));
+
+    if (usuarios.length === 0) {
+      lista.innerHTML = '<div class="admins-list__loading">No hay usuarios registrados aún.</div>';
+      return;
+    }
+
+    // Admins primero, luego por último acceso
+    usuarios.sort((a, b) => {
+      if (adminsSet.has(a.email) !== adminsSet.has(b.email))
+        return adminsSet.has(a.email) ? -1 : 1;
+      return (b.ultimoAcceso || '').localeCompare(a.ultimoAcceso || '');
+    });
+
+    const emailActual = auth.currentUser?.email;
+
+    lista.innerHTML = usuarios.map(u => {
+      const esAdminU = adminsSet.has(u.email);
+      const esTu     = u.email === emailActual;
+      const inicial  = (u.nombre || u.email || '?')[0].toUpperCase();
+      const fecha    = u.ultimoAcceso
+        ? new Date(u.ultimoAcceso).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+        : '—';
+      return `
+        <div class="usuario-item ${esAdminU ? 'usuario-item--admin' : ''}">
+          <div class="usuario-item__avatar">
+            ${u.foto ? `<img src="${u.foto}" alt="${u.nombre}">` : `<span>${inicial}</span>`}
+          </div>
+          <div class="usuario-item__info">
+            <span class="usuario-item__nombre">${u.nombre || u.email}</span>
+            <span class="usuario-item__email">${u.email}</span>
+            <span class="usuario-item__fecha">🕐 ${fecha}</span>
+          </div>
+          <div class="usuario-item__acciones">
+            ${esAdminU ? '<span class="usuario-item__badge--admin">Admin</span>' : ''}
+            ${esTu
+              ? '<span class="usuario-item__badge--tu">Tú</span>'
+              : `<button class="btn btn--sm ${esAdminU ? 'btn--danger' : 'btn--outline'}"
+                  data-action="${esAdminU ? 'degradar' : 'promover'}"
+                  data-email="${u.email}">
+                  ${esAdminU ? '⬇ Quitar' : '⬆ Admin'}
+                </button>`}
+          </div>
+        </div>`;
+    }).join('');
+
+    lista.querySelectorAll('[data-action]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const { action, email } = btn.dataset;
+        btn.disabled = true; btn.textContent = '⏳';
+        if (action === 'promover') {
+          await setDoc(doc(db, 'admind', email), { rol: 'admin' });
+          toast(`✅ ${email} ahora es administrador.`);
+        } else {
+          await deleteDoc(doc(db, 'admind', email));
+          toast(`🗑 ${email} ya no es administrador.`);
+        }
+        await cargarListaUsuarios();
+      });
+    });
+
+  } catch (err) {
+    console.error('Error al cargar usuarios:', err);
+    lista.innerHTML = '<div class="admins-list__loading" style="color:var(--peligro)">❌ Error al cargar usuarios.</div>';
+  }
+}
 
 async function abrirModalAdmins() {
   el('modalAdmins').style.display = 'flex';
   setTimeout(() => el('modalAdmins').classList.add('modal--visible'), 10);
   el('nuevoAdminEmail').value = '';
   el('adminFormError').style.display = 'none';
-  await cargarListaAdmins();
+  // Abrir en pestaña Usuarios por defecto
+  cambiarTabAdmin('usuarios');
 }
 
 function cerrarModalAdmins() {
   el('modalAdmins').classList.remove('modal--visible');
   setTimeout(() => { el('modalAdmins').style.display = 'none'; }, 200);
+}
+
+function cambiarTabAdmin(tab) {
+  // Actualizar tabs
+  document.querySelectorAll('.admin-tab').forEach(t => {
+    t.classList.toggle('admin-tab--active', t.dataset.tab === tab);
+  });
+  // Mostrar panel correcto
+  el('panelUsuarios').style.display = tab === 'usuarios' ? '' : 'none';
+  el('panelAdmins').style.display   = tab === 'admins'   ? '' : 'none';
+  // Cargar datos
+  if (tab === 'usuarios') cargarListaUsuarios();
+  if (tab === 'admins')   cargarListaAdmins();
 }
 
 async function cargarListaAdmins() {
@@ -1034,6 +1143,10 @@ function registrarEventos() {
   el('modalAdmins').addEventListener('keydown', e => {
     if (e.key === 'Escape') cerrarModalAdmins();
     if (e.key === 'Enter' && e.target.id === 'nuevoAdminEmail') agregarAdmin();
+  });
+  // Tabs del modal de admins
+  document.querySelectorAll('.admin-tab').forEach(tab => {
+    tab.addEventListener('click', () => cambiarTabAdmin(tab.dataset.tab));
   });
 
   // ── Edición inline delegada al tbody ──────────────────────────
