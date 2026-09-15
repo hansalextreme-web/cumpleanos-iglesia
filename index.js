@@ -1110,6 +1110,8 @@ function toast(msg, duracion = 3500) {
     setTimeout(() => { t.style.display = 'none'; }, 300);
   }, duracion);
 }
+// Exponer toast globalmente para que el script del SW pueda usarla
+window.toast = toast;
 
 // ─── Helpers generales ────────────────────────────────────────
 function el(id)           { return document.getElementById(id); }

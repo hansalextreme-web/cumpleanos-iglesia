@@ -1,40 +1,46 @@
 // ═══════════════════════════════════════════════════
-//  Service Worker – Directorio Aposento Alto
-//  Versión: 1.0.0
+//  Service Worker – Directorio Piedra Viva
+//  Versión: 2.0.0
 // ═══════════════════════════════════════════════════
 
-const CACHE_NAME  = 'aposento-v1';
+const CACHE_NAME  = 'aposento-v2';
 const CACHE_URLS  = [
   '/',
   '/index.html',
   '/style.css',
   '/index.js',
   '/directorio.js',
-  '/logo.png',
+  '/logo.png?v=2',
   'https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Outfit:wght@300;400;600;700&display=swap'
 ];
 
-// Instalar: cachear recursos clave
+// Instalar: cachear recursos clave y activar de inmediato
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(CACHE_URLS))
-      .then(() => self.skipWaiting())
+      .then(() => self.skipWaiting()) // forzar activación sin esperar
   );
 });
 
-// Activar: limpiar caches viejos
+// Activar: eliminar TODAS las cachés antiguas
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
+      Promise.all(
+        keys
+          .filter(k => k !== CACHE_NAME) // borrar cualquier versión anterior
+          .map(k => {
+            console.log('[SW] Eliminando caché antigua:', k);
+            return caches.delete(k);
+          })
+      )
+    ).then(() => self.clients.claim()) // tomar control de todos los clientes
   );
 });
 
 // Fetch: red primero, caché como respaldo
 self.addEventListener('fetch', e => {
-  // Solo cachear requests GET del mismo origen o Google Fonts
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
   const esMismoOrigen = url.origin === self.location.origin;
@@ -45,7 +51,6 @@ self.addEventListener('fetch', e => {
   e.respondWith(
     fetch(e.request)
       .then(res => {
-        // Guardar copia fresca en caché
         const copia = res.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(e.request, copia));
         return res;

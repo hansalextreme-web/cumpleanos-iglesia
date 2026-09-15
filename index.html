@@ -12,8 +12,8 @@
   <meta name="apple-mobile-web-app-title" content="Piedra Viva">
 
   <!-- Favicon -->
-  <link rel="icon" type="image/png" href="logo.png">
-  <link rel="apple-touch-icon" href="logo.png">
+  <link rel="icon" type="image/png" href="logo.png?v=2">
+  <link rel="apple-touch-icon" href="logo.png?v=2">
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json">
@@ -322,7 +322,27 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
-          .then(() => console.log('SW registrado'))
+          .then(reg => {
+            console.log('SW registrado');
+            // Detectar cuando hay una nueva versión instalada
+            reg.addEventListener('updatefound', () => {
+              const nuevoSW = reg.installing;
+              nuevoSW.addEventListener('statechange', () => {
+                // Solo notificar si ya había un SW activo (no es primera instalación)
+                if (nuevoSW.state === 'installed' && navigator.serviceWorker.controller) {
+                  // Usar el toast de la app si ya está disponible, si no un fallback
+                  const mostrar = () => {
+                    if (typeof toast === 'function') {
+                      toast('🔄 Nueva versión disponible. Cierra y vuelve a abrir la app.', 8000);
+                    } else {
+                      setTimeout(mostrar, 500); // esperar a que la app cargue
+                    }
+                  };
+                  mostrar();
+                }
+              });
+            });
+          })
           .catch(err => console.warn('SW error:', err));
       });
     }
