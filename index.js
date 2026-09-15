@@ -45,8 +45,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   await cargarDesdeFirestore();
   completarBarraCarga();
   mostrarBannerCumpleanos();
-  actualizarFaviconDinamico(); // 🎂 si hay cumpleaños hoy
-  actualizarBadgePWA();        // 🔴 badge nativo en ícono PWA
+  actualizarFaviconDinamico();
+  actualizarBadgePWA();
+  await pedirPermisoNotificaciones(); // solicitar permiso 1a vez
+  mostrarNotificacionCumpleanos();    // notificación local si hay cumpleaños hoy
   el('filtroMes').value = String(new Date().getMonth() + 1);
   renderizarLista();
   actualizarDashboard();
@@ -123,6 +125,71 @@ function generarConfetti() {
   }
 }
 
+
+// ─── Notificaciones locales ──────────────────────────────────
+
+const NOTIF_KEY = 'notif_cumple_fecha'; // localStorage key
+
+async function pedirPermisoNotificaciones() {
+  // Solo pedir si el navegador soporta notificaciones
+  if (!('Notification' in window)) return;
+  // Si ya tiene permiso o fue denegado, no preguntar de nuevo
+  if (Notification.permission === 'granted' || Notification.permission === 'denied') return;
+
+  // Esperar 3s para no interrumpir la carga inicial
+  await new Promise(r => setTimeout(r, 3000));
+  await Notification.requestPermission();
+}
+
+function mostrarNotificacionCumpleanos() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+
+  const hoy       = new Date();
+  const dHoy      = hoy.getDate();
+  const mHoy      = hoy.getMonth() + 1;
+  const fechaHoy  = `${hoy.getFullYear()}-${mHoy}-${dHoy}`;
+
+  // Verificar si ya se mostró la notificación hoy
+  if (localStorage.getItem(NOTIF_KEY) === fechaHoy) return;
+
+  const cumpleHoy = personas.filter(p => p.dia === dHoy && p.mes === mHoy);
+  if (cumpleHoy.length === 0) return;
+
+  // Construir mensaje
+  const nombres  = cumpleHoy.map(p => p.nombre.split(' ').slice(0,2).join(' ')).join(', ');
+  const titulo   = cumpleHoy.length === 1
+    ? `🎂 ¡Hoy cumple años ${cumpleHoy[0].nombre.split(' ')[0]}!`
+    : `🎂 ¡${cumpleHoy.length} cumpleaños hoy!`;
+  const cuerpo   = cumpleHoy.length === 1
+    ? `No olvides felicitar a ${nombres} hoy 💛`
+    : `${nombres} cumplen años hoy. ¡Felicítalos! 💛`;
+
+  // Mostrar via Service Worker (funciona con app cerrada)
+  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.ready.then(reg => {
+      reg.showNotification(titulo, {
+        body:    cuerpo,
+        icon:    'logo.png',
+        badge:   'icon-maskable.png',
+        tag:     'cumpleanos-hoy',        // reemplaza notif anterior del mismo día
+        renotify: false,
+        vibrate: [200, 100, 200],
+        data:    { url: '/' }
+      });
+    });
+  } else {
+    // Fallback: notificación directa
+    new Notification(titulo, {
+      body: cuerpo,
+      icon: 'logo.png',
+      tag:  'cumpleanos-hoy'
+    });
+  }
+
+  // Marcar como mostrada hoy
+  localStorage.setItem(NOTIF_KEY, fechaHoy);
+}
 
 // ─── Badge nativo PWA ────────────────────────────────────────
 function actualizarBadgePWA() {

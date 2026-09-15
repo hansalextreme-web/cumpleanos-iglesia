@@ -58,3 +58,23 @@ self.addEventListener('fetch', e => {
       .catch(() => caches.match(e.request))
   );
 });
+
+// Notificación: al hacer clic abre la app
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(lista => {
+      // Si ya hay una ventana abierta, enfocarla
+      const ventana = lista.find(c => c.url.includes(self.location.origin));
+      if (ventana) return ventana.focus();
+      // Si no, abrir una nueva
+      return clients.openWindow(url);
+    })
+  );
+});
+
+// Notificación: cerrar al deslizar
+self.addEventListener('notificationclose', e => {
+  console.log('[SW] Notificación cerrada:', e.notification.tag);
+});
