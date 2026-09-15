@@ -142,18 +142,28 @@ async function pedirPermisoNotificaciones() {
 }
 
 function mostrarNotificacionCumpleanos() {
-  if (!('Notification' in window)) return;
-  if (Notification.permission !== 'granted') return;
+  if (!('Notification' in window)) {
+    console.warn('[Notif] Navegador no soporta notificaciones');
+    return;
+  }
+  if (Notification.permission !== 'granted') {
+    console.warn('[Notif] Permiso no otorgado:', Notification.permission);
+    return;
+  }
 
   const hoy       = new Date();
   const dHoy      = hoy.getDate();
   const mHoy      = hoy.getMonth() + 1;
   const fechaHoy  = `${hoy.getFullYear()}-${mHoy}-${dHoy}`;
 
-  // Verificar si ya se mostró la notificación hoy
-  if (localStorage.getItem(NOTIF_KEY) === fechaHoy) return;
+  if (localStorage.getItem(NOTIF_KEY) === fechaHoy) {
+    console.log('[Notif] Ya se mostró hoy:', fechaHoy);
+    return;
+  }
 
   const cumpleHoy = personas.filter(p => p.dia === dHoy && p.mes === mHoy);
+  console.log('[Notif] Cumpleañeros hoy:', cumpleHoy.length, cumpleHoy.map(p => p.nombre));
+
   if (cumpleHoy.length === 0) return;
 
   // Construir mensaje

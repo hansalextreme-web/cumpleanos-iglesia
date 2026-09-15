@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════
 //  Service Worker – Directorio Piedra Viva
-//  Versión: 2.0.0
+//  Versión: 3.0.0
 // ═══════════════════════════════════════════════════
 
-const CACHE_NAME  = 'aposento-v2';
+const CACHE_NAME  = 'aposento-v3';
 const CACHE_URLS  = [
   '/',
   '/index.html',
