@@ -131,14 +131,20 @@ function generarConfetti() {
 const NOTIF_KEY = 'notif_cumple_fecha'; // localStorage key
 
 async function pedirPermisoNotificaciones() {
-  // Solo pedir si el navegador soporta notificaciones
   if (!('Notification' in window)) return;
-  // Si ya tiene permiso o fue denegado, no preguntar de nuevo
-  if (Notification.permission === 'granted' || Notification.permission === 'denied') return;
+  if (Notification.permission === 'denied') return;
 
   // Esperar 3s para no interrumpir la carga inicial
   await new Promise(r => setTimeout(r, 3000));
-  await Notification.requestPermission();
+
+  if (Notification.permission !== 'granted') {
+    const resultado = await Notification.requestPermission();
+    // Si acaba de aceptar, limpiar el flag para mostrar notificación de inmediato
+    if (resultado === 'granted') {
+      localStorage.removeItem(NOTIF_KEY);
+      mostrarNotificacionCumpleanos();
+    }
+  }
 }
 
 function mostrarNotificacionCumpleanos() {
