@@ -49,7 +49,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderizarLista();
   actualizarDashboard();
   registrarEventos();
-  iniciarAuth(); // inicia listener de sesión
+  iniciarAuth();
+  mostrarBannerActualizacion(); // notifica si hay nueva versión disponible
 });
 
 // ─── Banner de cumpleaños ─────────────────────────────────────
@@ -120,6 +121,28 @@ function generarConfetti() {
   }
 }
 
+
+// ─── Banner de actualización de ícono ────────────────────────
+const UPDATE_KEY     = 'pwa_update_visto_v1.7';
+const ICONO_VERSION  = 'icono_v3'; // incrementar cada vez que cambie el ícono
+
+function mostrarBannerActualizacion() {
+  // Si ya vio este aviso, no mostrar de nuevo
+  if (localStorage.getItem(UPDATE_KEY) === ICONO_VERSION) return;
+
+  const banner = el('bannerUpdate');
+  if (!banner) return;
+
+  banner.style.display = 'block';
+  requestAnimationFrame(() => banner.classList.add('banner-update--visible'));
+
+  el('btnUpdateClose').addEventListener('click', () => {
+    banner.classList.remove('banner-update--visible');
+    setTimeout(() => { banner.style.display = 'none'; }, 350);
+    // Recordar que ya fue visto
+    localStorage.setItem(UPDATE_KEY, ICONO_VERSION);
+  });
+}
 
 // ─── Autenticación Google ─────────────────────────────────────
 async function verificarAdmin(email) {
