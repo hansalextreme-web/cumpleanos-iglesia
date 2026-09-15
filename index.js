@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await cargarDesdeFirestore();
   completarBarraCarga();
   mostrarBannerCumpleanos();
+  actualizarFaviconDinamico(); // 🎂 si hay cumpleaños hoy
   el('filtroMes').value = String(new Date().getMonth() + 1);
   renderizarLista();
   actualizarDashboard();
@@ -121,6 +122,63 @@ function generarConfetti() {
   }
 }
 
+
+// ─── Favicon dinámico ────────────────────────────────────────
+function actualizarFaviconDinamico() {
+  const hoy       = new Date();
+  const cumpleHoy = personas.filter(p => p.dia === hoy.getDate() && p.mes === hoy.getMonth() + 1);
+
+  // Cambiar título de la pestaña
+  if (cumpleHoy.length > 0) {
+    const nombres = cumpleHoy.map(p => p.nombre.split(' ')[0]).join(', ');
+    document.title = `🎂 ¡Cumpleaños hoy! · Directorio Piedra Viva`;
+  }
+
+  // Crear favicon dinámico con canvas
+  const canvas  = document.createElement('canvas');
+  canvas.width  = 64;
+  canvas.height = 64;
+  const ctx     = canvas.getContext('2d');
+
+  const img = new Image();
+  img.src   = 'logo.png';
+  img.onload = () => {
+    // Dibujar logo original
+    ctx.drawImage(img, 0, 0, 64, 64);
+
+    if (cumpleHoy.length > 0) {
+      // Badge rojo en esquina superior derecha
+      ctx.beginPath();
+      ctx.arc(50, 14, 13, 0, 2 * Math.PI);
+      ctx.fillStyle = '#e30613';
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Emoji 🎂 o número de cumpleañeros
+      ctx.font      = 'bold 14px Arial';
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(cumpleHoy.length > 9 ? '9+' : String(cumpleHoy.length), 50, 14);
+    }
+
+    // Aplicar favicon
+    const link = document.querySelector("link[rel='icon']") || document.createElement('link');
+    link.rel   = 'icon';
+    link.type  = 'image/png';
+    link.href  = canvas.toDataURL('image/png');
+    document.head.appendChild(link);
+  };
+
+  img.onerror = () => {
+    // Fallback: solo emoji en el título si no carga la imagen
+    if (cumpleHoy.length > 0) {
+      document.title = `🎂 ¡Cumpleaños hoy! · Directorio Piedra Viva`;
+    }
+  };
+}
 
 // ─── Banner de actualización de ícono ────────────────────────
 const UPDATE_KEY     = 'pwa_update_visto_v1.7';
