@@ -29,7 +29,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app">
+  <div id="app" class="app" style="display:none">
 
     <!-- ══════════════ HEADER ══════════════ -->
     <header class="header">
@@ -160,6 +160,22 @@
     </main>
 
   </div><!-- /app -->
+
+  <!-- ══════════════ PANTALLA DE LOGIN ══════════════ -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-screen__box">
+      <img src="logo.png" alt="Aposento Alto" class="login-screen__logo">
+      <h1 class="login-screen__titulo">Directorio Piedra Viva</h1>
+      <p class="login-screen__subtitulo">Iglesia Cristiana Aposento Alto</p>
+      <p class="login-screen__desc">Inicia sesión para acceder al directorio de la congregación.</p>
+      <button class="login-screen__btn" id="btnLoginScreen">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        Ingresar con Google
+      </button>
+      <p id="loginScreenError" class="login-screen__error" style="display:none"></p>
+      <p class="login-screen__footer">Solo miembros autorizados pueden acceder.</p>
+    </div>
+  </div>
 
   <!-- ══════════════ MODAL CRUD ══════════════ -->
   <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" style="display:none">
@@ -335,7 +351,7 @@
     <div class="footer__inner">
       <span class="footer__logo">Iglesia Cristiana Aposento Alto</span>
       <span class="footer__sep">·</span>
-      <span class="footer__version">v1.9.0</span>
+      <span class="footer__version">v2.0.0</span>
       <span class="footer__sep">·</span>
       <span class="footer__copy">© 2026</span>
     </div>

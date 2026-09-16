@@ -309,7 +309,75 @@ async function verificarAdmin(email) {
   } catch { return false; }
 }
 
-function aplicarRol(admin) {
+// ─── Verificar si el email tiene acceso al directorio ─────────
+async function verificarAcceso(email) {
+  // 1. ¿Es admin?
+  const esAdminSnap = await getDoc(doc(db, 'admind', email));
+  if (esAdminSnap.exists()) return { acceso: true, rol: 'admin' };
+
+  // 2. ¿Su email está en algún miembro?
+  const snap = await getDocs(collection(db, 'miembros'));
+  const emailNorm = email.toLowerCase().trim();
+  const encontrado = snap.docs.some(d => {
+    const correo = (d.data().correo || '').toLowerCase().trim();
+    return correo === emailNorm;
+  });
+  if (encontrado) return { acceso: true, rol: 'lector' };
+
+  // Sin acceso
+  return { acceso: false, rol: null };
+}
+
+function mostrarPantallaAccesoDenegado(email) {
+  el('loginScreen') && (el('loginScreen').style.display = 'none');
+  const app = el('app');
+  if (app) app.style.display = 'none';
+
+  // Crear pantalla de acceso denegado si no existe
+  let pantalla = el('accesoDenegado');
+  if (!pantalla) {
+    pantalla = document.createElement('div');
+    pantalla.id        = 'accesoDenegado';
+    pantalla.className = 'login-screen';
+    pantalla.innerHTML = `
+      <div class="login-screen__box">
+        <div style="font-size:56px;margin-bottom:16px">🔒</div>
+        <h1 class="login-screen__titulo">Acceso restringido</h1>
+        <p class="login-screen__desc">
+          El correo <strong>${email}</strong> no está registrado en el directorio de la congregación.
+          <br><br>
+          Contacta a un administrador para solicitar acceso.
+        </p>
+        <button class="login-screen__btn" id="btnDenegadoSalir">
+          ↩ Cerrar sesión
+        </button>
+      </div>`;
+    document.body.appendChild(pantalla);
+    el('btnDenegadoSalir').addEventListener('click', () => signOut(auth));
+  }
+  pantalla.style.display = 'flex';
+}
+
+function ocultarPantallaAccesoDenegado() {
+  const p = el('accesoDenegado');
+  if (p) p.style.display = 'none';
+  const app = el('app');
+  if (app) app.style.display = '';
+}
+
+function mostrarLoginScreen() {
+  const ls = el('loginScreen');
+  if (ls) ls.style.display = 'flex';
+  const app = el('app');
+  if (app) app.style.display = 'none';
+}
+
+function ocultarLoginScreen() {
+  const ls = el('loginScreen');
+  if (ls) ls.style.display = 'none';
+  const app = el('app');
+  if (app) app.style.display = '';
+}
   esAdmin = admin;
   const btnsAdmin = document.querySelectorAll('.solo-admin');
   btnsAdmin.forEach(b => b.style.display = admin ? '' : 'none');
@@ -326,20 +394,55 @@ function aplicarRol(admin) {
 function iniciarAuth() {
   onAuthStateChanged(auth, async usuario => {
     if (usuario) {
-      const admin = await verificarAdmin(usuario.email);
+      // Verificar si tiene acceso al directorio
+      const { acceso, rol } = await verificarAcceso(usuario.email);
+
+      if (!acceso) {
+        // Email no está en admind ni en miembros → bloquear
+        mostrarPantallaAccesoDenegado(usuario.email);
+        return;
+      }
+
+      // Tiene acceso → mostrar app
+      ocultarPantallaAccesoDenegado();
+      ocultarLoginScreen();
+
+      const admin = rol === 'admin';
       el('btnLogin').style.display  = 'none';
       el('userBadge').style.display = '';
       el('userName').textContent    = usuario.displayName || usuario.email;
       el('userAvatar').src          = usuario.photoURL || '';
       aplicarRol(admin);
-      // Registrar/actualizar acceso en Firestore
       registrarAcceso(usuario, admin);
+
     } else {
+      // No logueado → mostrar pantalla de login
+      mostrarLoginScreen();
       el('btnLogin').style.display  = '';
       el('userBadge').style.display = 'none';
       aplicarRol(false);
     }
   });
+
+  // Botón de login en la pantalla de bienvenida
+  const btnLS = el('btnLoginScreen');
+  if (btnLS) {
+    btnLS.addEventListener('click', async () => {
+      const errEl = el('loginScreenError');
+      btnLS.disabled = true;
+      btnLS.textContent = '⏳ Ingresando...';
+      try {
+        await signInWithPopup(auth, new GoogleAuthProvider());
+      } catch (err) {
+        if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+          if (errEl) { errEl.textContent = '❌ Error al ingresar. Intenta de nuevo.'; errEl.style.display = 'block'; }
+        }
+      } finally {
+        btnLS.disabled = false;
+        btnLS.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg> Ingresar con Google';
+      }
+    });
+  }
 
   el('btnLogin').addEventListener('click', async () => {
     try {

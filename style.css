@@ -1687,3 +1687,97 @@ body.is-admin td.editable:hover::after { opacity: 1; }
   .usuario-item { flex-wrap: wrap; }
   .usuario-item__acciones { width: 100%; justify-content: flex-end; }
 }
+
+/* ── Pantalla de login / acceso denegado ─────────────────────── */
+.login-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: linear-gradient(135deg, #f8fafc 0%, #fff1f1 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.login-screen__box {
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 12px 48px rgba(0,0,0,.12);
+  padding: 40px 36px;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+  animation: slideDown .4s cubic-bezier(.22,1,.36,1);
+}
+
+.login-screen__logo {
+  width: 120px;
+  height: auto;
+  margin-bottom: 20px;
+}
+
+.login-screen__titulo {
+  font-family: 'Cinzel', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--texto);
+  margin-bottom: 4px;
+}
+
+.login-screen__subtitulo {
+  font-size: 13px;
+  color: var(--rojo);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 20px;
+}
+
+.login-screen__desc {
+  font-size: 14px;
+  color: var(--gris-700);
+  line-height: 1.6;
+  margin-bottom: 28px;
+}
+
+.login-screen__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--rojo);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 13px 28px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  width: 100%;
+  transition: background var(--trans), transform var(--trans);
+  min-height: 48px;
+}
+
+.login-screen__btn:hover  { background: var(--rojo-dark); }
+.login-screen__btn:active { transform: scale(.97); }
+.login-screen__btn:disabled { opacity: .7; cursor: not-allowed; }
+
+.login-screen__error {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--peligro);
+}
+
+.login-screen__footer {
+  margin-top: 20px;
+  font-size: 12px;
+  color: var(--gris-500);
+}
+
+@media (max-width: 640px) {
+  .login-screen__box { padding: 32px 24px; }
+  .login-screen__logo { width: 100px; }
+  .login-screen__titulo { font-size: 18px; }
+}
