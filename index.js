@@ -40,22 +40,54 @@ const MESES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 // ─── Init ─────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
+  // Registrar eventos primero (incluyendo botón de login)
+  registrarEventosLogin();
+  // Iniciar auth — cuando el usuario esté logueado y autorizado, se carga todo
+  iniciarAuth();
+});
+
+// Eventos solo del login (antes de cargar datos)
+function registrarEventosLogin() {
+  const btnLS = el('btnLoginScreen');
+  if (btnLS) {
+    btnLS.addEventListener('click', async () => {
+      const errEl = el('loginScreenError');
+      if (errEl) errEl.style.display = 'none';
+      btnLS.disabled = true;
+      btnLS.innerHTML = '⏳ Ingresando...';
+      try {
+        await signInWithPopup(auth, new GoogleAuthProvider());
+      } catch (err) {
+        if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+          if (errEl) {
+            errEl.textContent  = '❌ Error al ingresar. Intenta de nuevo.';
+            errEl.style.display = 'block';
+          }
+        }
+      } finally {
+        btnLS.disabled = false;
+        btnLS.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg> Ingresar con Google`;
+      }
+    });
+  }
+}
+
+async function cargarApp() {
   iniciarBarraCarga();
   await cargarDesdeFirestore();
   completarBarraCarga();
   mostrarBannerCumpleanos();
   actualizarFaviconDinamico();
   actualizarBadgePWA();
-  await pedirPermisoNotificaciones(); // solicitar permiso 1a vez
-  mostrarNotificacionCumpleanos();    // notificación local si hay cumpleaños hoy
+  await pedirPermisoNotificaciones();
+  mostrarNotificacionCumpleanos();
   el('filtroMes').value = String(new Date().getMonth() + 1);
   renderizarLista();
   actualizarDashboard();
   registrarEventos();
-  iniciarAuth();
-  mostrarBannerActualizacion(); // notifica si hay nueva versión disponible
-});
+  mostrarBannerActualizacion();
+}
 
 // ─── Banner de cumpleaños ─────────────────────────────────────
 function mostrarBannerCumpleanos() {
@@ -392,18 +424,20 @@ function ocultarLoginScreen() {
 }
 
 function iniciarAuth() {
+  // Mostrar pantalla de login por defecto hasta verificar sesión
+  mostrarLoginScreen();
+
   onAuthStateChanged(auth, async usuario => {
     if (usuario) {
       // Verificar si tiene acceso al directorio
       const { acceso, rol } = await verificarAcceso(usuario.email);
 
       if (!acceso) {
-        // Email no está en admind ni en miembros → bloquear
         mostrarPantallaAccesoDenegado(usuario.email);
         return;
       }
 
-      // Tiene acceso → mostrar app
+      // Tiene acceso → cargar app
       ocultarPantallaAccesoDenegado();
       ocultarLoginScreen();
 
@@ -415,34 +449,16 @@ function iniciarAuth() {
       aplicarRol(admin);
       registrarAcceso(usuario, admin);
 
+      // Cargar datos solo cuando el usuario está autorizado
+      await cargarApp();
+
     } else {
-      // No logueado → mostrar pantalla de login
       mostrarLoginScreen();
       el('btnLogin').style.display  = '';
       el('userBadge').style.display = 'none';
       aplicarRol(false);
     }
   });
-
-  // Botón de login en la pantalla de bienvenida
-  const btnLS = el('btnLoginScreen');
-  if (btnLS) {
-    btnLS.addEventListener('click', async () => {
-      const errEl = el('loginScreenError');
-      btnLS.disabled = true;
-      btnLS.textContent = '⏳ Ingresando...';
-      try {
-        await signInWithPopup(auth, new GoogleAuthProvider());
-      } catch (err) {
-        if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
-          if (errEl) { errEl.textContent = '❌ Error al ingresar. Intenta de nuevo.'; errEl.style.display = 'block'; }
-        }
-      } finally {
-        btnLS.disabled = false;
-        btnLS.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg> Ingresar con Google';
-      }
-    });
-  }
 
   el('btnLogin').addEventListener('click', async () => {
     try {
