@@ -50,27 +50,36 @@ document.addEventListener('DOMContentLoaded', () => {
 // Eventos solo del login (antes de cargar datos)
 function registrarEventosLogin() {
   const btnLS = el('btnLoginScreen');
-  if (btnLS) {
-    btnLS.addEventListener('click', async () => {
-      const errEl = el('loginScreenError');
-      if (errEl) errEl.style.display = 'none';
-      btnLS.disabled = true;
-      btnLS.innerHTML = '⏳ Ingresando...';
-      try {
-        await signInWithPopup(auth, new GoogleAuthProvider());
-      } catch (err) {
-        if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
-          if (errEl) {
-            errEl.textContent  = '❌ Error al ingresar. Intenta de nuevo.';
-            errEl.style.display = 'block';
-          }
-        }
-      } finally {
+  if (!btnLS) return;
+
+  btnLS.addEventListener('click', () => {
+    // IMPORTANTE: signInWithPopup debe llamarse sincrónicamente desde el click
+    // para evitar que el navegador bloquee el popup
+    const errEl = el('loginScreenError');
+    if (errEl) errEl.style.display = 'none';
+    btnLS.disabled = true;
+    btnLS.innerHTML = '⏳ Ingresando...';
+
+    signInWithPopup(auth, new GoogleAuthProvider())
+      .then(() => {
+        // onAuthStateChanged se encarga del resto
+      })
+      .catch(err => {
+        console.error('[Login]', err.code, err.message);
         btnLS.disabled = false;
         btnLS.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg> Ingresar con Google`;
-      }
-    });
-  }
+        if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') return;
+        if (errEl) {
+          const mensajes = {
+            'auth/popup-blocked':        '🔒 El navegador bloqueó el popup. Permite popups para este sitio.',
+            'auth/unauthorized-domain':  '🌐 Dominio no autorizado en Firebase.',
+            'auth/network-request-failed':'📡 Sin conexión. Verifica tu internet.',
+          };
+          errEl.textContent   = mensajes[err.code] || `❌ Error: ${err.code}`;
+          errEl.style.display = 'block';
+        }
+      });
+  });
 }
 
 async function cargarApp() {
