@@ -292,6 +292,7 @@
       <div class="admin-tabs">
         <button class="admin-tab admin-tab--active" data-tab="usuarios">👤 Usuarios</button>
         <button class="admin-tab" data-tab="admins">🛡 Administradores</button>
+        <button class="admin-tab" data-tab="lectores">👁 Lectores</button>
       </div>
 
       <div class="modal__body">
@@ -324,6 +325,24 @@
           </div>
         </div>
 
+        <!-- ── Panel Lectores ── -->
+        <div id="panelLectores" style="display:none">
+          <p style="color:var(--gris-500);margin-bottom:1rem;font-size:13px">
+            👁 Los lectores pueden ver el directorio aunque su correo no esté en los miembros. Solo lectura.
+          </p>
+          <div class="admins-list" id="lectoresList">
+            <div class="admins-list__loading">⏳ Cargando lectores...</div>
+          </div>
+          <div class="admin-form">
+            <h3 class="admin-form__title">Agregar lector</h3>
+            <div class="admin-form__fields">
+              <input type="email" id="nuevoLectorEmail" placeholder="correo@ejemplo.com" autocomplete="off" class="admin-form__input">
+              <button class="btn btn--primary" id="btnAgregarLector">+ Agregar</button>
+            </div>
+            <p id="lectorFormError" class="form-error" style="display:none"></p>
+          </div>
+        </div>
+
       </div>
       <div class="modal__footer">
         <button class="btn btn--ghost" id="btnCerrarAdmins">Cerrar</button>
@@ -351,7 +370,7 @@
     <div class="footer__inner">
       <span class="footer__logo">Iglesia Cristiana Aposento Alto</span>
       <span class="footer__sep">·</span>
-      <span class="footer__version">v2.0.0</span>
+      <span class="footer__version">v2.1.0</span>
       <span class="footer__sep">·</span>
       <span class="footer__copy">© 2026</span>
     </div>

@@ -352,20 +352,25 @@ async function verificarAdmin(email) {
 
 // ─── Verificar si el email tiene acceso al directorio ─────────
 async function verificarAcceso(email) {
-  // 1. ¿Es admin?
-  const esAdminSnap = await getDoc(doc(db, 'admind', email));
+  const emailNorm = email.toLowerCase().trim();
+
+  // Condición 4: ¿Es admin? → acceso total + escritura
+  const esAdminSnap = await getDoc(doc(db, 'admind', emailNorm));
   if (esAdminSnap.exists()) return { acceso: true, rol: 'admin' };
 
-  // 2. ¿Su email está en algún miembro?
+  // Condición 3: ¿Tiene permiso de lectura explícito en colección 'lectores'?
+  const esLectorSnap = await getDoc(doc(db, 'lectores', emailNorm));
+  if (esLectorSnap.exists()) return { acceso: true, rol: 'lector' };
+
+  // Condición 2: ¿Su email está registrado en algún miembro del directorio?
   const snap = await getDocs(collection(db, 'miembros'));
-  const emailNorm = email.toLowerCase().trim();
-  const encontrado = snap.docs.some(d => {
+  const esMiembro = snap.docs.some(d => {
     const correo = (d.data().correo || '').toLowerCase().trim();
     return correo === emailNorm;
   });
-  if (encontrado) return { acceso: true, rol: 'lector' };
+  if (esMiembro) return { acceso: true, rol: 'lector' };
 
-  // Sin acceso
+  // Condición 1+2: Sin acceso
   return { acceso: false, rol: null };
 }
 
@@ -1278,17 +1283,75 @@ function cerrarModalAdmins() {
   setTimeout(() => { el('modalAdmins').style.display = 'none'; }, 200);
 }
 
+async function cargarListaLectores() {
+  const lista = el('lectoresList');
+  lista.innerHTML = '<div class="admins-list__loading">⏳ Cargando lectores...</div>';
+  try {
+    const snap = await getDocs(collection(db, 'lectores'));
+    if (snap.empty) {
+      lista.innerHTML = '<div class="admins-list__loading">No hay lectores registrados.</div>';
+      return;
+    }
+    const emailActual = auth.currentUser?.email;
+    lista.innerHTML = snap.docs.map(d => `
+      <div class="admin-item">
+        <span class="admin-item__email">${d.id}</span>
+        ${d.id === emailActual ? '<span class="admin-item__badge">TÚ</span>' : ''}
+        ${d.id !== emailActual ? `<button class="admin-item__remove" data-email="${d.id}" title="Quitar lector">🗑</button>` : ''}
+      </div>`).join('');
+    lista.querySelectorAll('.admin-item__remove').forEach(btn => {
+      btn.addEventListener('click', () => eliminarLector(btn.dataset.email));
+    });
+  } catch (err) {
+    console.error('Error al cargar lectores:', err);
+    lista.innerHTML = '<div class="admins-list__loading" style="color:var(--peligro)">❌ Error al cargar lectores.</div>';
+  }
+}
+
+async function agregarLector() {
+  const email   = el('nuevoLectorEmail').value.trim().toLowerCase();
+  const errorEl = el('lectorFormError');
+  if (!email) { errorEl.textContent = 'Ingresa un correo.'; errorEl.style.display = 'block'; return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errorEl.textContent = 'Correo inválido.'; errorEl.style.display = 'block'; return; }
+  errorEl.style.display = 'none';
+  el('btnAgregarLector').disabled = true;
+  el('btnAgregarLector').textContent = '⏳';
+  try {
+    const existe = await getDoc(doc(db, 'lectores', email));
+    if (existe.exists()) { errorEl.textContent = 'Este correo ya es lector.'; errorEl.style.display = 'block'; return; }
+    await setDoc(doc(db, 'lectores', email), { rol: 'lector', creadoEn: new Date().toISOString() });
+    toast(`✅ ${email} agregado como lector.`);
+    el('nuevoLectorEmail').value = '';
+    await cargarListaLectores();
+  } catch (err) {
+    errorEl.textContent = 'Error al agregar. Intenta de nuevo.'; errorEl.style.display = 'block';
+  } finally {
+    el('btnAgregarLector').disabled = false;
+    el('btnAgregarLector').textContent = '+ Agregar';
+  }
+}
+
+async function eliminarLector(email) {
+  if (!confirm(`¿Quitar acceso de lectura a ${email}?`)) return;
+  try {
+    await deleteDoc(doc(db, 'lectores', email));
+    toast(`🗑 ${email} eliminado de lectores.`);
+    await cargarListaLectores();
+  } catch (err) {
+    toast('❌ Error al eliminar. Intenta de nuevo.');
+  }
+}
+
 function cambiarTabAdmin(tab) {
-  // Actualizar tabs
   document.querySelectorAll('.admin-tab').forEach(t => {
     t.classList.toggle('admin-tab--active', t.dataset.tab === tab);
   });
-  // Mostrar panel correcto
   el('panelUsuarios').style.display = tab === 'usuarios' ? '' : 'none';
   el('panelAdmins').style.display   = tab === 'admins'   ? '' : 'none';
-  // Cargar datos
+  el('panelLectores').style.display = tab === 'lectores' ? '' : 'none';
   if (tab === 'usuarios') cargarListaUsuarios();
   if (tab === 'admins')   cargarListaAdmins();
+  if (tab === 'lectores') cargarListaLectores();
 }
 
 async function cargarListaAdmins() {
@@ -1434,6 +1497,10 @@ function registrarEventos() {
   // Tabs del modal de admins
   document.querySelectorAll('.admin-tab').forEach(tab => {
     tab.addEventListener('click', () => cambiarTabAdmin(tab.dataset.tab));
+  });
+  el('btnAgregarLector').addEventListener('click', agregarLector);
+  el('nuevoLectorEmail').addEventListener('keydown', e => {
+    if (e.key === 'Enter') agregarLector();
   });
 
   // ── Edición inline delegada al tbody ──────────────────────────

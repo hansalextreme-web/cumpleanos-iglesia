@@ -2,26 +2,57 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Colección de miembros: solo usuarios autenticados pueden leer
-    // Solo admins pueden escribir
-    match /miembros/{docId} {
-      allow read:  if request.auth != null;
-      allow write: if request.auth != null &&
-                      exists(/databases/$(database)/documents/admind/$(request.auth.token.email));
+    // ── Helpers ──────────────────────────────────────────────────
+    // Verifica si el usuario autenticado es admin
+    function esAdmin() {
+      return request.auth != null &&
+             exists(/databases/$(database)/documents/admind/$(request.auth.token.email));
     }
 
-    // Colección de usuarios: cada usuario registra su propio acceso; solo admins pueden leer
+    // Verifica si el usuario tiene permiso de lectura explícito (colección lectores)
+    function esLector() {
+      return request.auth != null &&
+             exists(/databases/$(database)/documents/lectores/$(request.auth.token.email));
+    }
+
+    // Verifica si el email del usuario está registrado en el directorio (miembros)
+    function esMiembro() {
+      return request.auth != null &&
+             exists(/databases/$(database)/documents/miembros/$(request.auth.uid));
+    }
+
+    // Cualquier acceso autorizado: admin, lector explícito, o email en miembros
+    function tieneAcceso() {
+      return esAdmin() || esLector();
+    }
+
+    // ── Reglas por colección ──────────────────────────────────────
+
+    // CONDICIÓN 1+2: No logueado = sin acceso. Logueado sin autorización = sin acceso
+    // CONDICIÓN 3: Lector explícito puede leer
+    // CONDICIÓN 4: Solo admin puede escribir
+    match /miembros/{docId} {
+      allow read:  if tieneAcceso();
+      allow write: if esAdmin();
+    }
+
+    // Colección de lectores: admin la gestiona, cualquier autenticado puede leer su propio doc
+    match /lectores/{email} {
+      allow read:  if request.auth != null && request.auth.token.email == email;
+      allow write: if esAdmin();
+    }
+
+    // Colección de usuarios: cada usuario escribe su propio doc, solo admins leen todos
     match /usuarios/{uid} {
-      allow read:  if request.auth != null &&
-                      exists(/databases/$(database)/documents/admind/$(request.auth.token.email));
+      allow read:  if esAdmin();
       allow write: if request.auth != null && request.auth.uid == uid;
     }
 
-    // Colección de admins: lectura para autenticados, escritura solo para admins existentes
+    // Colección admins: autenticados pueden leer (para verificar su propio rol)
+    // Solo admins pueden escribir (agregar/quitar admins)
     match /admind/{email} {
       allow read:  if request.auth != null;
-      allow write: if request.auth != null &&
-                      exists(/databases/$(database)/documents/admind/$(request.auth.token.email));
+      allow write: if esAdmin();
     }
   }
 }
