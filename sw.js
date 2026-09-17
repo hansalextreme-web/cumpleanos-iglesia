@@ -3,7 +3,7 @@
 //  Versión: 3.0.0
 // ═══════════════════════════════════════════════════
 
-const CACHE_NAME  = 'aposento-v3';
+const CACHE_NAME  = 'aposento-v3.1';
 const CACHE_URLS  = [
   '/',
   '/index.html',

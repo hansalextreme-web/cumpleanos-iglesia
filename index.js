@@ -11,7 +11,7 @@ import { getFirestore, collection, getDocs,
          doc, setDoc, deleteDoc, writeBatch,
          getDoc, query, where }               from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getAuth, GoogleAuthProvider,
-         signInWithPopup, signOut,
+         signInWithPopup, signInWithRedirect, getRedirectResult, signOut,
          onAuthStateChanged }                     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
 const firebaseConfig = {
@@ -53,33 +53,77 @@ function registrarEventosLogin() {
   if (!btnLS) return;
 
   btnLS.addEventListener('click', () => {
-    // IMPORTANTE: signInWithPopup debe llamarse sincrónicamente desde el click
-    // para evitar que el navegador bloquee el popup
-    const errEl = el('loginScreenError');
-    if (errEl) errEl.style.display = 'none';
-    btnLS.disabled = true;
-    btnLS.innerHTML = '⏳ Ingresando...';
-
-    signInWithPopup(auth, new GoogleAuthProvider())
-      .then(() => {
-        // onAuthStateChanged se encarga del resto
-      })
-      .catch(err => {
-        console.error('[Login]', err.code, err.message);
-        btnLS.disabled = false;
-        btnLS.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg> Ingresar con Google`;
-        if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') return;
-        if (errEl) {
-          const mensajes = {
-            'auth/popup-blocked':        '🔒 El navegador bloqueó el popup. Permite popups para este sitio.',
-            'auth/unauthorized-domain':  '🌐 Dominio no autorizado en Firebase.',
-            'auth/network-request-failed':'📡 Sin conexión. Verifica tu internet.',
-          };
-          errEl.textContent   = mensajes[err.code] || `❌ Error: ${err.code}`;
-          errEl.style.display = 'block';
-        }
-      });
+    iniciarSesionConDeteccionMovil();
   });
+}
+
+// Función para detectar dispositivos móviles
+function esMobile() {
+  return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+         window.innerWidth <= 768;
+}
+
+// Función de inicio de sesión adaptada para móvil y desktop
+async function iniciarSesionConDeteccionMovil() {
+  const btnLS = el('btnLoginScreen');
+  const errEl = el('loginScreenError');
+  
+  if (!btnLS) return;
+
+  // Ocultar error anterior
+  if (errEl) errEl.style.display = 'none';
+  
+  // Cambiar botón a estado de carga
+  btnLS.disabled = true;
+  btnLS.innerHTML = '⏳ Ingresando...';
+
+  try {
+    const provider = new GoogleAuthProvider();
+    
+    if (esMobile()) {
+      // Para móviles: usar redirect (no se bloquea)
+      await signInWithRedirect(auth, provider);
+      // No hay .then() aquí porque la página se redirige
+      // El resultado se maneja en iniciarAuth() con getRedirectResult
+    } else {
+      // Para desktop: usar popup
+      await signInWithPopup(auth, provider);
+      // onAuthStateChanged se encarga del resto
+    }
+  } catch (err) {
+    console.error('[Login]', err.code, err.message);
+    restaurarBotonLogin();
+    
+    // No mostrar error si el usuario canceló
+    if (err.code === 'auth/popup-closed-by-user' || 
+        err.code === 'auth/cancelled-popup-request') return;
+        
+    mostrarErrorLogin(err, errEl);
+  }
+}
+
+function restaurarBotonLogin() {
+  const btnLS = el('btnLoginScreen');
+  if (btnLS) {
+    btnLS.disabled = false;
+    btnLS.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg> Ingresar con Google`;
+  }
+}
+
+function mostrarErrorLogin(err, errEl) {
+  if (!errEl) return;
+  
+  const mensajes = {
+    'auth/popup-blocked':        '🔒 El navegador bloqueó el popup. Permite popups para este sitio.',
+    'auth/unauthorized-domain':  '🌐 Dominio no autorizado en Firebase.',
+    'auth/network-request-failed':'📡 Sin conexión. Verifica tu internet.',
+    'auth/internal-error':       '⚠️ Error interno. Intenta de nuevo.',
+    'auth/cancelled-popup-request': '❌ Operación cancelada.',
+    'auth/web-storage-unsupported': '🔧 Tu navegador no soporta almacenamiento local.',
+  };
+  
+  errEl.textContent = mensajes[err.code] || `❌ Error: ${err.code}`;
+  errEl.style.display = 'block';
 }
 
 async function cargarApp() {
@@ -473,6 +517,19 @@ function iniciarAuth() {
   // Mostrar pantalla de login por defecto hasta verificar sesión
   mostrarLoginScreen();
 
+  // Manejar resultado de redirect (móviles) al cargar la página
+  getRedirectResult(auth).then(result => {
+    if (result) {
+      console.log('[Auth] Login por redirect exitoso:', result.user.email);
+      // onAuthStateChanged se encargará de verificar permisos
+    }
+  }).catch(err => {
+    console.error('[Auth] Error en redirect result:', err);
+    restaurarBotonLogin();
+    const errEl = el('loginScreenError');
+    mostrarErrorLogin(err, errEl);
+  });
+
   onAuthStateChanged(auth, async usuario => {
     if (usuario) {
       // Mostrar spinner mientras se verifican permisos
@@ -484,6 +541,7 @@ function iniciarAuth() {
       } catch (err) {
         console.error('[Auth] Error verificando acceso:', err);
         ocultarSpinnerLogin();
+        restaurarBotonLogin();
         mostrarLoginScreen();
         return;
       }
@@ -512,6 +570,7 @@ function iniciarAuth() {
 
     } else {
       ocultarSpinnerLogin();
+      restaurarBotonLogin();
       mostrarLoginScreen();
       el('btnLogin').style.display  = '';
       el('userBadge').style.display = 'none';
@@ -519,26 +578,7 @@ function iniciarAuth() {
     }
   });
 
-  el('btnLogin').addEventListener('click', async () => {
-    try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
-    } catch (err) {
-      console.error('Auth error:', err.code, err.message);
-      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
-        return; // usuario cerró el popup — no es un error real
-      }
-      // Mostrar mensaje específico según el código de error
-      const mensajes = {
-        'auth/popup-blocked':              '🔒 El navegador bloqueó el popup. Permite popups para este sitio.',
-        'auth/unauthorized-domain':        '🌐 Dominio no autorizado en Firebase. Agrégalo en Authentication → Dominios.',
-        'auth/operation-not-allowed':      '⚙️ Google Sign-in no está habilitado en Firebase.',
-        'auth/network-request-failed':     '📡 Sin conexión. Verifica tu internet.',
-        'auth/internal-error':             '⚠️ Error interno de Firebase. Intenta de nuevo.',
-      };
-      const msg = mensajes[err.code] || `❌ Error: ${err.code || err.message}`;
-      toast(msg, 6000);
-    }
-  });
+  el('btnLogin').addEventListener('click', iniciarSesionConDeteccionMovil);
 
   el('btnLogout').addEventListener('click', async () => {
     await signOut(auth);
