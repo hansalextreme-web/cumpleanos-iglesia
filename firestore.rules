@@ -2,57 +2,78 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Helpers ──────────────────────────────────────────────────
-    // Verifica si el usuario autenticado es admin
+    // ─── Helpers ────────────────────────────────────────────────
+    // Todos los helpers verifican request.auth != null primero.
+    // El ID del documento en miembros, lectores y admin ES el email
+    // (minúsculas), igual que request.auth.token.email, lo que permite
+    // verificaciones O(1) con exists() sin queries secundarias.
+
+    // US-004: admin = documento en /admin/{email}
     function esAdmin() {
-      return request.auth != null &&
-             exists(/databases/$(database)/documents/admind/$(request.auth.token.email));
+      return request.auth != null
+          && request.auth.token.email != null
+          && exists(/databases/$(database)/documents/admin/$(request.auth.token.email));
     }
 
-    // Verifica si el usuario tiene permiso de lectura explícito (colección lectores)
-    function esLector() {
-      return request.auth != null &&
-             exists(/databases/$(database)/documents/lectores/$(request.auth.token.email));
-    }
-
-    // Verifica si el email del usuario está registrado en el directorio (miembros)
+    // US-003 AC-2: miembro = documento en /miembros/{email}
     function esMiembro() {
-      return request.auth != null &&
-             exists(/databases/$(database)/documents/miembros/$(request.auth.uid));
+      return request.auth != null
+          && request.auth.token.email != null
+          && exists(/databases/$(database)/documents/miembros/$(request.auth.token.email));
     }
 
-    // Cualquier acceso autorizado: admin, lector explícito, o email en miembros
+    // US-003 AC-1: lector = documento en /lectores/{email}
+    function esLector() {
+      return request.auth != null
+          && request.auth.token.email != null
+          && exists(/databases/$(database)/documents/lectores/$(request.auth.token.email));
+    }
+
+    // Acceso de lectura al directorio: cualquiera de los tres roles
+    // Cubre US-003 AC-1, AC-2, AC-3 y bloquea US-001 y US-002
     function tieneAcceso() {
-      return esAdmin() || esLector();
+      return esAdmin() || esMiembro() || esLector();
     }
 
-    // ── Reglas por colección ──────────────────────────────────────
-
-    // CONDICIÓN 1+2: No logueado = sin acceso. Logueado sin autorización = sin acceso
-    // CONDICIÓN 3: Lector explícito puede leer
-    // CONDICIÓN 4: Solo admin puede escribir
+    // ─── miembros/{email} ───────────────────────────────────────
+    // US-001: no autenticado → DENEGADO
+    // US-002: autenticado sin registro → DENEGADO
+    // US-003: miembro, lector o admin → lectura permitida
+    // US-003 AC-4 / US-004 AC-3: solo admin escribe
     match /miembros/{docId} {
       allow read:  if tieneAcceso();
       allow write: if esAdmin();
     }
 
-    // Colección de lectores: admin la gestiona, cualquier autenticado puede leer su propio doc
+    // ─── lectores/{email} ───────────────────────────────────────
+    // US-005 AC-1: admin puede crear, actualizar y eliminar
+    // US-005 AC-2: cada usuario lee solo su propio doc; admin lista todos
     match /lectores/{email} {
-      allow read:  if request.auth != null && request.auth.token.email == email;
+      allow read:  if esAdmin()
+                  || (request.auth != null
+                      && request.auth.token.email == email);
       allow write: if esAdmin();
     }
 
-    // Colección de usuarios: cada usuario escribe su propio doc, solo admins leen todos
+    // ─── admin/{email} ──────────────────────────────────────────
+    // US-004 AC-4: nadie se auto-promueve desde el cliente
+    //   → solo un admin existente puede escribir aquí
+    // US-004 AC-5: cada usuario lee solo su propio doc para saber si es admin;
+    //   un admin puede leer/listar toda la colección
+    match /admin/{email} {
+      allow read:  if esAdmin()
+                  || (request.auth != null
+                      && request.auth.token.email == email);
+      allow write: if esAdmin();
+    }
+
+    // ─── usuarios/{uid} ─────────────────────────────────────────
+    // US-006 AC-1: cada usuario escribe solo su propio perfil
+    // US-006 AC-2: cada usuario lee solo su propio perfil; admin lee todos
     match /usuarios/{uid} {
-      allow read:  if esAdmin();
+      allow read:  if esAdmin()
+                  || (request.auth != null && request.auth.uid == uid);
       allow write: if request.auth != null && request.auth.uid == uid;
-    }
-
-    // Colección admins: autenticados pueden leer (para verificar su propio rol)
-    // Solo admins pueden escribir (agregar/quitar admins)
-    match /admind/{email} {
-      allow read:  if request.auth != null;
-      allow write: if esAdmin();
     }
   }
 }

@@ -27,7 +27,7 @@ const app  = initializeApp(firebaseConfig);
 const db   = getFirestore(app);
 const auth = getAuth(app);
 const COL  = 'miembros';
-const COL_ADMINS = 'admind'; // colección con emails autorizados
+const COL_ADMINS = 'admin'; // colección con emails autorizados (ID = email)
 
 // ─── Estado global ───────────────────────────────────────────
 const STORAGE_KEY  = 'cumpleanosIglesia_v2';
@@ -387,42 +387,32 @@ function mostrarBannerActualizacion() {
 }
 
 // ─── Autenticación Google ─────────────────────────────────────
-async function verificarAdmin(email) {
-  try {
-    const snap = await getDoc(doc(db, COL_ADMINS, email));
-    return snap.exists();
-  } catch { return false; }
-}
 
 // ─── Verificar si el email tiene acceso al directorio ─────────
 async function verificarAcceso(email) {
   const emailNorm = email.toLowerCase().trim();
 
-  // ── Paso 1: admin y lector en paralelo (Promise.all = 1 roundtrip en vez de 2) ──
-  const [adminSnap, lectorSnap] = await Promise.all([
-    getDoc(doc(db, 'admind',   emailNorm)),
-    getDoc(doc(db, 'lectores', emailNorm))
+  // Paso 1: admin, lector y miembro en paralelo — 3 lecturas O(1) por ID
+  // Corresponde a US-002, US-003, US-004
+  const [adminSnap, lectorSnap, miembroSnap] = await Promise.all([
+    getDoc(doc(db, 'admin',    emailNorm)),   // US-004
+    getDoc(doc(db, 'lectores', emailNorm)),   // US-003 AC-1
+    getDoc(doc(db, 'miembros', emailNorm))    // US-003 AC-2
   ]);
 
-  if (adminSnap.exists())  return { acceso: true, rol: 'admin'  };
-  if (lectorSnap.exists()) return { acceso: true, rol: 'lector' };
+  if (adminSnap.exists())   return { acceso: true, rol: 'admin'   };
+  if (lectorSnap.exists())  return { acceso: true, rol: 'lector'  };
+  if (miembroSnap.exists()) return { acceso: true, rol: 'miembro' };
 
-  // ── Paso 2: buscar email en miembros con query filtrada (no trae toda la colección) ──
+  // Fallback: buscar en caché local si Firestore no responde
   try {
-    const q    = query(collection(db, 'miembros'), where('correo', '==', emailNorm));
-    const snap = await getDocs(q);
-    if (!snap.empty) return { acceso: true, rol: 'lector' };
-  } catch {
-    // Fallback: buscar en caché local si Firestore no responde
     const guardado = localStorage.getItem('cumpleanosIglesia_v2');
     if (guardado) {
-      try {
-        const local = JSON.parse(guardado);
-        if (local.some(p => (p.correo || '').toLowerCase().trim() === emailNorm))
-          return { acceso: true, rol: 'lector' };
-      } catch { /* sigue */ }
+      const local = JSON.parse(guardado);
+      if (local.some(p => (p.correo || '').toLowerCase().trim() === emailNorm))
+        return { acceso: true, rol: 'miembro' };
     }
-  }
+  } catch { /* sigue */ }
 
   return { acceso: false, rol: null };
 }
@@ -1281,7 +1271,7 @@ async function cargarListaUsuarios() {
   try {
     const [snapUsuarios, snapAdmins] = await Promise.all([
       getDocs(collection(db, 'usuarios')),
-      getDocs(collection(db, 'admind'))
+      getDocs(collection(db, 'admin'))
     ]);
 
     const adminsSet = new Set(snapAdmins.docs.map(d => d.id));
@@ -1336,10 +1326,10 @@ async function cargarListaUsuarios() {
         const { action, email } = btn.dataset;
         btn.disabled = true; btn.textContent = '⏳';
         if (action === 'promover') {
-          await setDoc(doc(db, 'admind', email), { rol: 'admin' });
+          await setDoc(doc(db, 'admin', email), { rol: 'admin' });
           toast(`✅ ${email} ahora es administrador.`);
         } else {
-          await deleteDoc(doc(db, 'admind', email));
+          await deleteDoc(doc(db, 'admin', email));
           toast(`🗑 ${email} ya no es administrador.`);
         }
         await cargarListaUsuarios();
