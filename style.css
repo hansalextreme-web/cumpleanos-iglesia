@@ -1781,3 +1781,26 @@ body.is-admin td.editable:hover::after { opacity: 1; }
   .login-screen__logo { width: 100px; }
   .login-screen__titulo { font-size: 18px; }
 }
+
+/* ── Spinner botón login ─────────────────────────────────────── */
+.spinner-btn {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.login-screen__btn:disabled {
+  opacity: .85;
+  cursor: not-allowed;
+  gap: 10px;
+}

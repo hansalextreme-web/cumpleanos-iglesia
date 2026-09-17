@@ -9,7 +9,7 @@ import { directorioIglesia, transformarDirectorio } from './directorio.js';
 import { initializeApp }                          from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getFirestore, collection, getDocs,
          doc, setDoc, deleteDoc, writeBatch,
-         getDoc }                                 from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+         getDoc, query, where }               from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getAuth, GoogleAuthProvider,
          signInWithPopup, signOut,
          onAuthStateChanged }                     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
@@ -354,23 +354,32 @@ async function verificarAdmin(email) {
 async function verificarAcceso(email) {
   const emailNorm = email.toLowerCase().trim();
 
-  // Condición 4: ¿Es admin? → acceso total + escritura
-  const esAdminSnap = await getDoc(doc(db, 'admind', emailNorm));
-  if (esAdminSnap.exists()) return { acceso: true, rol: 'admin' };
+  // ── Paso 1: admin y lector en paralelo (Promise.all = 1 roundtrip en vez de 2) ──
+  const [adminSnap, lectorSnap] = await Promise.all([
+    getDoc(doc(db, 'admind',   emailNorm)),
+    getDoc(doc(db, 'lectores', emailNorm))
+  ]);
 
-  // Condición 3: ¿Tiene permiso de lectura explícito en colección 'lectores'?
-  const esLectorSnap = await getDoc(doc(db, 'lectores', emailNorm));
-  if (esLectorSnap.exists()) return { acceso: true, rol: 'lector' };
+  if (adminSnap.exists())  return { acceso: true, rol: 'admin'  };
+  if (lectorSnap.exists()) return { acceso: true, rol: 'lector' };
 
-  // Condición 2: ¿Su email está registrado en algún miembro del directorio?
-  const snap = await getDocs(collection(db, 'miembros'));
-  const esMiembro = snap.docs.some(d => {
-    const correo = (d.data().correo || '').toLowerCase().trim();
-    return correo === emailNorm;
-  });
-  if (esMiembro) return { acceso: true, rol: 'lector' };
+  // ── Paso 2: buscar email en miembros con query filtrada (no trae toda la colección) ──
+  try {
+    const q    = query(collection(db, 'miembros'), where('correo', '==', emailNorm));
+    const snap = await getDocs(q);
+    if (!snap.empty) return { acceso: true, rol: 'lector' };
+  } catch {
+    // Fallback: buscar en caché local si Firestore no responde
+    const guardado = localStorage.getItem('cumpleanosIglesia_v2');
+    if (guardado) {
+      try {
+        const local = JSON.parse(guardado);
+        if (local.some(p => (p.correo || '').toLowerCase().trim() === emailNorm))
+          return { acceso: true, rol: 'lector' };
+      } catch { /* sigue */ }
+    }
+  }
 
-  // Condición 1+2: Sin acceso
   return { acceso: false, rol: null };
 }
 
@@ -425,6 +434,27 @@ function ocultarLoginScreen() {
   if (app) app.style.display = '';
 }
 
+function mostrarSpinnerLogin(texto = 'Verificando...') {
+  // Reutilizar la pantalla de login con estado de carga
+  const ls = el('loginScreen');
+  if (!ls) return;
+  ls.style.display = 'flex';
+  const btn  = el('btnLoginScreen');
+  const desc = ls.querySelector('.login-screen__desc');
+  if (btn)  { btn.disabled = true; btn.innerHTML = `<span class="spinner-btn"></span> ${texto}`; }
+  if (desc) desc.textContent = texto;
+}
+
+function ocultarSpinnerLogin() {
+  const btn  = el('btnLoginScreen');
+  const desc = el('loginScreen')?.querySelector('.login-screen__desc');
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg> Ingresar con Google`;
+  }
+  if (desc) desc.textContent = 'Inicia sesión para acceder al directorio de la congregación.';
+}
+
 function aplicarRol(admin) {
   esAdmin = admin;
   const btnsAdmin = document.querySelectorAll('.solo-admin');
@@ -445,8 +475,20 @@ function iniciarAuth() {
 
   onAuthStateChanged(auth, async usuario => {
     if (usuario) {
-      // Verificar si tiene acceso al directorio
-      const { acceso, rol } = await verificarAcceso(usuario.email);
+      // Mostrar spinner mientras se verifican permisos
+      mostrarSpinnerLogin('Verificando acceso...');
+
+      let acceso, rol;
+      try {
+        ({ acceso, rol } = await verificarAcceso(usuario.email));
+      } catch (err) {
+        console.error('[Auth] Error verificando acceso:', err);
+        ocultarSpinnerLogin();
+        mostrarLoginScreen();
+        return;
+      }
+
+      ocultarSpinnerLogin();
 
       if (!acceso) {
         mostrarPantallaAccesoDenegado(usuario.email);
@@ -469,6 +511,7 @@ function iniciarAuth() {
       await cargarApp();
 
     } else {
+      ocultarSpinnerLogin();
       mostrarLoginScreen();
       el('btnLogin').style.display  = '';
       el('userBadge').style.display = 'none';
