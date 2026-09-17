@@ -425,32 +425,31 @@ function mostrarBannerActualizacion() {
 // ─── Autenticación Google ─────────────────────────────────────
 
 // ─── Verificar si el email tiene acceso al directorio ─────────
-// Solo consulta las colecciones que las rules permiten leer al propio usuario:
-//   admin/{email}   → permitido si email == request.auth.token.email
-//   lectores/{email}→ permitido si email == request.auth.token.email
-// NO consulta miembros aquí porque las rules bloquean esa colección
-// a quien no está en ninguna — eso causaba permission-denied en Promise.all.
+// Consulta las 3 colecciones de autorización en paralelo.
+// Las rules permiten que cada usuario lea su PROPIO documento en
+// admin, lectores y miembros por ID, sin causar permission-denied.
 async function verificarAcceso(email) {
   const emailNorm = email.toLowerCase().trim();
 
   try {
-    // Dos lecturas en paralelo — cada una lee el propio documento del usuario.
-    // Las rules siempre permiten esto (email == request.auth.token.email).
-    const [adminSnap, lectorSnap] = await Promise.all([
-      getDoc(doc(db, 'admin',    emailNorm)),
-      getDoc(doc(db, 'lectores', emailNorm))
+    // 3 lecturas O(1) en paralelo — cada una sobre el propio email del usuario
+    const [adminSnap, lectorSnap, miembroSnap] = await Promise.all([
+      getDoc(doc(db, 'admin',    emailNorm)),   // ¿es admin?
+      getDoc(doc(db, 'lectores', emailNorm)),   // ¿tiene permiso de lector?
+      getDoc(doc(db, 'miembros', emailNorm))    // ¿está en el directorio?
     ]);
 
-    if (adminSnap.exists())  return { acceso: true, rol: 'admin'  };
-    if (lectorSnap.exists()) return { acceso: true, rol: 'lector' };
+    if (adminSnap.exists())   return { acceso: true, rol: 'admin'   };
+    if (lectorSnap.exists())  return { acceso: true, rol: 'lector'  };
+    if (miembroSnap.exists()) return { acceso: true, rol: 'miembro' };
 
   } catch (err) {
     if (err?.code === 'permission-denied') {
-      // Las rules bloquearon ambas lecturas — definitivamente sin acceso.
+      // Rules bloquearon la lectura — sin acceso, no es un crash
       console.warn('[verificarAcceso] permission-denied para:', emailNorm);
       return { acceso: false, rol: null };
     }
-    // Otro error (red, timeout) → relanzar para que iniciarAuth lo maneje
+    // Error de red u otro — relanzar para que iniciarAuth muestre el mensaje correcto
     throw err;
   }
 

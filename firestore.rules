@@ -29,37 +29,36 @@ service cloud.firestore {
     }
 
     // ─── miembros/{email} ────────────────────────────────────────
-    // Solo quien ya tiene acceso (admin/lector/miembro) puede leer.
-    // Solo admin puede escribir.
-    match /miembros/{docId} {
-      allow read:  if tieneAcceso();
+    // tieneAcceso() → puede leer toda la colección (admin/lector/miembro)
+    // Cualquier autenticado puede leer su PROPIO documento por ID para
+    // que verificarAcceso() compruebe membresía sin permission-denied.
+    match /miembros/{email} {
+      allow read:  if tieneAcceso()
+                  || (request.auth != null
+                      && request.auth.token.email == email);
       allow write: if esAdmin();
     }
 
     // ─── lectores/{email} ────────────────────────────────────────
-    // IMPORTANTE: cualquier usuario autenticado puede leer su PROPIO documento.
-    // Esto es necesario para que verificarAcceso() en el cliente pueda
-    // comprobar si el usuario es lector SIN causar permission-denied.
+    // Cualquier autenticado puede leer su PROPIO documento.
     match /lectores/{email} {
-      allow read:  if request.auth != null
-                  && (esAdmin() || request.auth.token.email == email);
+      allow read:  if esAdmin()
+                  || (request.auth != null
+                      && request.auth.token.email == email);
       allow write: if esAdmin();
     }
 
     // ─── admin/{email} ───────────────────────────────────────────
-    // IMPORTANTE: cualquier usuario autenticado puede leer su PROPIO documento.
-    // Esto es necesario para que verificarAcceso() pueda comprobar si el
-    // usuario es admin SIN causar permission-denied.
+    // Cualquier autenticado puede leer su PROPIO documento.
     // Solo un admin existente puede escribir (impide auto-promoción).
     match /admin/{email} {
-      allow read:  if request.auth != null
-                  && (esAdmin() || request.auth.token.email == email);
+      allow read:  if esAdmin()
+                  || (request.auth != null
+                      && request.auth.token.email == email);
       allow write: if esAdmin();
     }
 
     // ─── usuarios/{uid} ──────────────────────────────────────────
-    // Cada usuario lee y escribe solo su propio perfil.
-    // Admin puede leer todos.
     match /usuarios/{uid} {
       allow read:  if esAdmin()
                   || (request.auth != null && request.auth.uid == uid);
