@@ -177,6 +177,23 @@
     </div>
   </div>
 
+  <!-- ══════════════ PANTALLA: ACCESO DENEGADO ══════════════ -->
+  <!-- Condición 2: usuario logueado cuyo correo NO está en admin/lectores/miembros -->
+  <div id="accesoDenegado" class="login-screen" style="display:none">
+    <div class="login-screen__box">
+      <div class="login-screen__icono-acceso">🔒</div>
+      <h1 class="login-screen__titulo">Acceso restringido</h1>
+      <p class="login-screen__desc">
+        El correo <strong id="emailDenegado"></strong> no está registrado
+        en el directorio de la congregación.<br><br>
+        Si crees que es un error, contacta a un administrador para solicitar acceso.
+      </p>
+      <button class="login-screen__btn login-screen__btn--secundario" id="btnDenegadoSalir">
+        ↩ Cerrar sesión
+      </button>
+    </div>
+  </div>
+
   <!-- ══════════════ MODAL CRUD ══════════════ -->
   <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" style="display:none">
     <div class="modal__backdrop" id="modalBackdrop"></div>

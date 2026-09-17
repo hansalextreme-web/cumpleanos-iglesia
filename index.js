@@ -454,40 +454,33 @@ async function verificarAcceso(email) {
 }
 
 function mostrarPantallaAccesoDenegado(email) {
-  el('loginScreen') && (el('loginScreen').style.display = 'none');
+  // Ocultar login y app
+  const ls = el('loginScreen');
+  if (ls) ls.style.display = 'none';
   const app = el('app');
   if (app) app.style.display = 'none';
 
-  // Crear pantalla de acceso denegado si no existe
-  let pantalla = el('accesoDenegado');
-  if (!pantalla) {
-    pantalla = document.createElement('div');
-    pantalla.id        = 'accesoDenegado';
-    pantalla.className = 'login-screen';
-    pantalla.innerHTML = `
-      <div class="login-screen__box">
-        <div style="font-size:56px;margin-bottom:16px">🔒</div>
-        <h1 class="login-screen__titulo">Acceso restringido</h1>
-        <p class="login-screen__desc">
-          El correo <strong>${email}</strong> no está registrado en el directorio de la congregación.
-          <br><br>
-          Contacta a un administrador para solicitar acceso.
-        </p>
-        <button class="login-screen__btn" id="btnDenegadoSalir">
-          ↩ Cerrar sesión
-        </button>
-      </div>`;
-    document.body.appendChild(pantalla);
-    el('btnDenegadoSalir').addEventListener('click', () => signOut(auth));
-  }
+  // Usar el elemento estático del HTML — mostrar email del usuario
+  const pantalla = el('accesoDenegado');
+  if (!pantalla) return;
+
+  const emailEl = el('emailDenegado');
+  if (emailEl) emailEl.textContent = email;
+
   pantalla.style.display = 'flex';
+
+  // Conectar botón "Cerrar sesión" (solo una vez)
+  const btn = el('btnDenegadoSalir');
+  if (btn && !btn._listenerOk) {
+    btn.addEventListener('click', () => signOut(auth));
+    btn._listenerOk = true;
+  }
 }
 
 function ocultarPantallaAccesoDenegado() {
   const p = el('accesoDenegado');
   if (p) p.style.display = 'none';
-  const app = el('app');
-  if (app) app.style.display = '';
+  // No tocar #app aquí — lo gestiona ocultarLoginScreen() al conceder acceso
 }
 
 function mostrarLoginScreen() {

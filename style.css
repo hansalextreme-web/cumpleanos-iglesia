@@ -1764,6 +1764,25 @@ body.is-admin td.editable:hover::after { opacity: 1; }
 .login-screen__btn:active { transform: scale(.97); }
 .login-screen__btn:disabled { opacity: .7; cursor: not-allowed; }
 
+/* Botón secundario (cerrar sesión en pantalla de acceso denegado) */
+.login-screen__btn--secundario {
+  background: transparent;
+  color: var(--rojo);
+  border: 2px solid var(--rojo);
+  margin-top: 8px;
+}
+.login-screen__btn--secundario:hover {
+  background: var(--rojo);
+  color: #fff;
+}
+
+/* Ícono grande en pantalla de acceso denegado */
+.login-screen__icono-acceso {
+  font-size: 56px;
+  line-height: 1;
+  margin-bottom: 16px;
+}
+
 .login-screen__error {
   margin-top: 12px;
   font-size: 13px;
