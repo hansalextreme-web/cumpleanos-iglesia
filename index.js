@@ -1331,6 +1331,13 @@ async function registrarAcceso(usuario, esAdmin) {
 // ─── Gestión de usuarios (panel admin) ────────────────────────
 async function cargarListaUsuarios() {
   const lista = el('usuariosList');
+
+  // Guard: no ejecutar si el usuario no es admin
+  if (!clienteEsAdmin()) {
+    lista.innerHTML = '<div class="admins-list__loading" style="color:var(--peligro)">🔒 Solo los administradores pueden ver esta lista.</div>';
+    return;
+  }
+
   lista.innerHTML = '<div class="admins-list__loading">⏳ Cargando usuarios...</div>';
 
   try {
@@ -1408,6 +1415,11 @@ async function cargarListaUsuarios() {
 }
 
 async function abrirModalAdmins() {
+  // Guard: solo admins pueden abrir este panel
+  if (!clienteEsAdmin()) {
+    toast('🔒 Solo los administradores pueden gestionar usuarios.');
+    return;
+  }
   el('modalAdmins').style.display = 'flex';
   setTimeout(() => el('modalAdmins').classList.add('modal--visible'), 10);
   el('nuevoAdminEmail').value = '';
@@ -1423,6 +1435,13 @@ function cerrarModalAdmins() {
 
 async function cargarListaLectores() {
   const lista = el('lectoresList');
+
+  // Guard: no ejecutar si el usuario no es admin
+  if (!clienteEsAdmin()) {
+    lista.innerHTML = '<div class="admins-list__loading" style="color:var(--peligro)">🔒 Solo los administradores pueden ver esta lista.</div>';
+    return;
+  }
+
   lista.innerHTML = '<div class="admins-list__loading">⏳ Cargando lectores...</div>';
   try {
     const snap = await getDocs(collection(db, 'lectores'));
@@ -1497,6 +1516,13 @@ function cambiarTabAdmin(tab) {
 
 async function cargarListaAdmins() {
   const lista = el('adminsList');
+
+  // Guard: no ejecutar si el usuario no es admin
+  if (!clienteEsAdmin()) {
+    lista.innerHTML = '<div class="admins-list__loading" style="color:var(--peligro)">🔒 Solo los administradores pueden ver esta lista.</div>';
+    return;
+  }
+
   lista.innerHTML = '<div class="admins-list__loading">⏳ Cargando administradores...</div>';
   
   try {
