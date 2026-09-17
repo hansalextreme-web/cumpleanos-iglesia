@@ -419,6 +419,8 @@ function ocultarLoginScreen() {
   const app = el('app');
   if (app) app.style.display = '';
 }
+
+function aplicarRol(admin) {
   esAdmin = admin;
   const btnsAdmin = document.querySelectorAll('.solo-admin');
   btnsAdmin.forEach(b => b.style.display = admin ? '' : 'none');
