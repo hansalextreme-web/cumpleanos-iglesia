@@ -35,6 +35,42 @@ let personas       = [];
 let filtroActivo   = null;
 let indiceEditando = -1;
 let esAdmin        = false; // rol del usuario actual
+let rolActual      = null;  // 'admin' | 'lector' | 'miembro' | null
+
+// ─── Helpers de autorización de cliente ───────────────────────
+// IMPORTANTE: estas funciones son solo para la UI (mostrar/ocultar).
+// La línea de defensa real son las Security Rules en firestore.rules.
+
+/** Devuelve true si el usuario tiene rol admin en memoria. */
+function clienteEsAdmin() {
+  return esAdmin === true;
+}
+
+/** Devuelve true si el usuario puede ver el directorio (cualquier rol). */
+function puedeLeerDirectorio() {
+  return esAdmin === true
+      || rolActual === 'lector'
+      || rolActual === 'miembro';
+}
+
+/**
+ * Envuelve una operación Firestore y captura permission-denied.
+ * Evita que un error de permisos se propague como excepción no manejada.
+ * @param {Promise} promesa   La operación Firestore.
+ * @param {string}  contexto  Texto para el log (ej. 'leer miembros').
+ * @returns {Promise<any|null>}  El resultado o null si fue denegado.
+ */
+async function intentarFirestore(promesa, contexto = 'operación') {
+  try {
+    return await promesa;
+  } catch (err) {
+    if (err?.code === 'permission-denied') {
+      console.warn(`[Firestore] Permiso denegado al ${contexto}.`);
+      return null;
+    }
+    throw err; // otros errores sí se propagan
+  }
+}
 
 const MESES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -548,6 +584,7 @@ function iniciarAuth() {
       ocultarLoginScreen();
 
       const admin = rol === 'admin';
+      rolActual = rol; // T5: actualizar estado global de rol
       el('btnLogin').style.display  = 'none';
       el('userBadge').style.display = '';
       el('userName').textContent    = usuario.displayName || usuario.email;
@@ -564,6 +601,7 @@ function iniciarAuth() {
       mostrarLoginScreen();
       el('btnLogin').style.display  = '';
       el('userBadge').style.display = 'none';
+      rolActual = null; // T5: limpiar rol al cerrar sesión
       aplicarRol(false);
     }
   });
@@ -586,7 +624,18 @@ function conTimeout(promesa, ms) {
 
 async function cargarDesdeFirestore() {
   try {
-    const snap = await conTimeout(getDocs(collection(db, COL)), 8000);
+    // T5: intentarFirestore captura permission-denied sin crashear
+    const snap = await intentarFirestore(
+      conTimeout(getDocs(collection(db, COL)), 8000),
+      'leer directorio'
+    );
+
+    // null = permission-denied (no debería ocurrir si verificarAcceso pasó, pero defensivo)
+    if (snap === null) {
+      toast('🔒 Sin permiso para leer el directorio. Contacta a un administrador.');
+      personas = [];
+      return;
+    }
 
     if (snap.empty) {
       toast('⏳ Primera carga: subiendo directorio a la nube…');
@@ -616,31 +665,38 @@ async function cargarDesdeFirestore() {
 }
 
 // ─── Firestore: subir lote inicial ────────────────────────────
+// T4: el ID del documento DEBE ser el email normalizado (minúsculas).
+// Esto es requerido por las Security Rules: exists(/miembros/{email})
+// solo funciona si el ID coincide exactamente con request.auth.token.email.
+// Nunca usar addDoc ni doc(collection(db, COL)) que genera auto-IDs.
 async function subirLoteAFirestore(lista) {
-  // Firestore admite máximo 500 ops por batch
-  const CHUNK = 400;
+  const CHUNK = 400; // Firestore admite máximo 500 ops por batch
   for (let i = 0; i < lista.length; i += CHUNK) {
     const batch = writeBatch(db);
     lista.slice(i, i + CHUNK).forEach(p => {
-      const ref = doc(collection(db, COL));
+      // ID = email normalizado. Si no tiene correo, usar un fallback legible
+      const emailId = (p.correo || '').toLowerCase().trim()
+                   || `sin-correo-${p.nombre || 'desconocido'}-${i}`.toLowerCase().replace(/\s+/g, '-');
+      const ref   = doc(db, COL, emailId);
       const datos = limpiarParaFirestore(p);
-      batch.set(ref, datos);
-      p.id = ref.id; // guardar el id generado
+      batch.set(ref, datos, { merge: true }); // merge evita sobrescribir si ya existe
+      p.id = emailId; // guardar el id para referencias locales
     });
     await batch.commit();
   }
 }
 
 // ─── Firestore: guardar un miembro ───────────────────────────
+// T4: el ID siempre es el email normalizado.
+// Si la persona no tiene correo se usa su id previo o un slug del nombre.
 async function guardarEnFirestore(persona) {
   const datos = limpiarParaFirestore(persona);
-  if (persona.id) {
-    await setDoc(doc(db, COL, persona.id), datos);
-  } else {
-    const ref = doc(collection(db, COL));
-    await setDoc(ref, datos);
-    persona.id = ref.id;
-  }
+  // Determinar ID: prioridad → correo normalizado → id existente → slug nombre
+  const emailId = (persona.correo || '').toLowerCase().trim()
+               || persona.id
+               || `sin-correo-${(persona.nombre || 'desconocido').toLowerCase().replace(/\s+/g, '-')}`;
+  persona.id = emailId; // actualizar referencia local
+  await setDoc(doc(db, COL, emailId), datos, { merge: true });
 }
 
 // ─── Firestore: eliminar un miembro ──────────────────────────
@@ -1248,18 +1304,22 @@ function cerrarDetalle() {
   setTimeout(() => { el('modalDetalle').style.display = 'none'; }, 200);
 }
 
-// ─── Registro de accesos ──────────────────────────────────────
+// ─── T8: Upsert de perfil propio tras login exitoso ──────────
+// setDoc + merge: crea el doc si no existe, actualiza si ya existe.
+// ID = uid de Firebase Auth (no email), según US-006.
 async function registrarAcceso(usuario, esAdmin) {
   try {
     await setDoc(doc(db, 'usuarios', usuario.uid), {
-      email:        usuario.email,
+      email:        (usuario.email || '').toLowerCase().trim(),
       nombre:       usuario.displayName || '',
       foto:         usuario.photoURL    || '',
       esAdmin:      esAdmin,
+      rol:          rolActual,          // 'admin' | 'lector' | 'miembro' | null
       ultimoAcceso: new Date().toISOString(),
     }, { merge: true });
   } catch (err) {
-    console.warn('No se pudo registrar acceso:', err.message);
+    // permission-denied no debe crashear la app — solo log
+    console.warn('[registrarAcceso] No se pudo guardar perfil:', err.code || err.message);
   }
 }
 
@@ -1377,7 +1437,10 @@ async function cargarListaLectores() {
     });
   } catch (err) {
     console.error('Error al cargar lectores:', err);
-    lista.innerHTML = '<div class="admins-list__loading" style="color:var(--peligro)">❌ Error al cargar lectores.</div>';
+    const msg = err?.code === 'permission-denied'
+      ? '🔒 Solo los administradores pueden ver esta lista.'
+      : '❌ Error al cargar lectores.';
+    lista.innerHTML = `<div class="admins-list__loading" style="color:var(--peligro)">${msg}</div>`;
   }
 }
 
@@ -1456,7 +1519,10 @@ async function cargarListaAdmins() {
 
   } catch (err) {
     console.error('Error al cargar admins:', err);
-    lista.innerHTML = '<div class="admins-list__loading" style="color:var(--peligro)">❌ Error al cargar administradores.</div>';
+    const msg = err?.code === 'permission-denied'
+      ? '🔒 Solo los administradores pueden ver esta lista.'
+      : '❌ Error al cargar administradores.';
+    lista.innerHTML = `<div class="admins-list__loading" style="color:var(--peligro)">${msg}</div>`;
   }
 }
 

@@ -4,12 +4,16 @@
   "private": true,
   "scripts": {
     "start": "npx -y serve .",
-    "dev": "npx -y serve ."
+    "dev":   "npx -y serve .",
+    "test":  "node --experimental-vm-modules tests/rules.test.js",
+    "test:emulator": "firebase emulators:exec --only firestore,auth \"node tests/rules.test.js\""
   },
   "dependencies": {
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "firebase-admin": "^12.3.0",
     "jimp": "^0.22.12"
   }
 }
