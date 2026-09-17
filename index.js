@@ -425,30 +425,34 @@ function mostrarBannerActualizacion() {
 // ─── Autenticación Google ─────────────────────────────────────
 
 // ─── Verificar si el email tiene acceso al directorio ─────────
+// Solo consulta las colecciones que las rules permiten leer al propio usuario:
+//   admin/{email}   → permitido si email == request.auth.token.email
+//   lectores/{email}→ permitido si email == request.auth.token.email
+// NO consulta miembros aquí porque las rules bloquean esa colección
+// a quien no está en ninguna — eso causaba permission-denied en Promise.all.
 async function verificarAcceso(email) {
   const emailNorm = email.toLowerCase().trim();
 
-  // Paso 1: admin, lector y miembro en paralelo — 3 lecturas O(1) por ID
-  // Corresponde a US-002, US-003, US-004
-  const [adminSnap, lectorSnap, miembroSnap] = await Promise.all([
-    getDoc(doc(db, 'admin',    emailNorm)),   // US-004
-    getDoc(doc(db, 'lectores', emailNorm)),   // US-003 AC-1
-    getDoc(doc(db, 'miembros', emailNorm))    // US-003 AC-2
-  ]);
-
-  if (adminSnap.exists())   return { acceso: true, rol: 'admin'   };
-  if (lectorSnap.exists())  return { acceso: true, rol: 'lector'  };
-  if (miembroSnap.exists()) return { acceso: true, rol: 'miembro' };
-
-  // Fallback: buscar en caché local si Firestore no responde
   try {
-    const guardado = localStorage.getItem('cumpleanosIglesia_v2');
-    if (guardado) {
-      const local = JSON.parse(guardado);
-      if (local.some(p => (p.correo || '').toLowerCase().trim() === emailNorm))
-        return { acceso: true, rol: 'miembro' };
+    // Dos lecturas en paralelo — cada una lee el propio documento del usuario.
+    // Las rules siempre permiten esto (email == request.auth.token.email).
+    const [adminSnap, lectorSnap] = await Promise.all([
+      getDoc(doc(db, 'admin',    emailNorm)),
+      getDoc(doc(db, 'lectores', emailNorm))
+    ]);
+
+    if (adminSnap.exists())  return { acceso: true, rol: 'admin'  };
+    if (lectorSnap.exists()) return { acceso: true, rol: 'lector' };
+
+  } catch (err) {
+    if (err?.code === 'permission-denied') {
+      // Las rules bloquearon ambas lecturas — definitivamente sin acceso.
+      console.warn('[verificarAcceso] permission-denied para:', emailNorm);
+      return { acceso: false, rol: null };
     }
-  } catch { /* sigue */ }
+    // Otro error (red, timeout) → relanzar para que iniciarAuth lo maneje
+    throw err;
+  }
 
   return { acceso: false, rol: null };
 }
@@ -558,9 +562,15 @@ function iniciarAuth() {
       try {
         ({ acceso, rol } = await verificarAcceso(usuario.email));
       } catch (err) {
+        // Error de red u otro inesperado — restaurar UI y mostrar mensaje
         console.error('[Auth] Error verificando acceso:', err);
         ocultarSpinnerLogin();
         restaurarBotonLogin();
+        const errEl = el('loginScreenError');
+        if (errEl) {
+          errEl.textContent   = '📡 Error de conexión. Verifica tu internet e intenta de nuevo.';
+          errEl.style.display = 'block';
+        }
         mostrarLoginScreen();
         return;
       }
@@ -568,6 +578,9 @@ function iniciarAuth() {
       ocultarSpinnerLogin();
 
       if (!acceso) {
+        // Sin permiso: cerrar sesión automáticamente para no dejar al usuario
+        // en un estado autenticado-pero-bloqueado, y mostrar pantalla denegado.
+        await signOut(auth).catch(() => {});
         mostrarPantallaAccesoDenegado(usuario.email);
         return;
       }
