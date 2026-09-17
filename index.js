@@ -425,32 +425,32 @@ function mostrarBannerActualizacion() {
 // ─── Autenticación Google ─────────────────────────────────────
 
 // ─── Verificar si el email tiene acceso al directorio ─────────
-// Consulta las 3 colecciones de autorización en paralelo.
-// Las rules permiten que cada usuario lea su PROPIO documento en
-// admin, lectores y miembros por ID, sin causar permission-denied.
+// admin y lectores usan ID=email → getDoc O(1)
+// miembros usa auto-ID → query where('correo', '==', email)
 async function verificarAcceso(email) {
   const emailNorm = email.toLowerCase().trim();
 
   try {
-    // 3 lecturas O(1) en paralelo — cada una sobre el propio email del usuario
-    const [adminSnap, lectorSnap, miembroSnap] = await Promise.all([
-      getDoc(doc(db, 'admin',    emailNorm)),   // ¿es admin?
-      getDoc(doc(db, 'lectores', emailNorm)),   // ¿tiene permiso de lector?
-      getDoc(doc(db, 'miembros', emailNorm))    // ¿está en el directorio?
+    // Paso 1: admin y lectores en paralelo — ID = email, siempre permitido
+    const [adminSnap, lectorSnap] = await Promise.all([
+      getDoc(doc(db, 'admin',    emailNorm)),
+      getDoc(doc(db, 'lectores', emailNorm))
     ]);
 
-    if (adminSnap.exists())   return { acceso: true, rol: 'admin'   };
-    if (lectorSnap.exists())  return { acceso: true, rol: 'lector'  };
-    if (miembroSnap.exists()) return { acceso: true, rol: 'miembro' };
+    if (adminSnap.exists())  return { acceso: true, rol: 'admin'  };
+    if (lectorSnap.exists()) return { acceso: true, rol: 'lector' };
+
+    // Paso 2: miembros tiene auto-ID → buscar por campo correo
+    const q    = query(collection(db, 'miembros'), where('correo', '==', emailNorm));
+    const snap = await getDocs(q);
+    if (!snap.empty) return { acceso: true, rol: 'miembro' };
 
   } catch (err) {
     if (err?.code === 'permission-denied') {
-      // Rules bloquearon la lectura — sin acceso, no es un crash
       console.warn('[verificarAcceso] permission-denied para:', emailNorm);
       return { acceso: false, rol: null };
     }
-    // Error de red u otro — relanzar para que iniciarAuth muestre el mensaje correcto
-    throw err;
+    throw err; // error de red u otro — lo maneja iniciarAuth
   }
 
   return { acceso: false, rol: null };

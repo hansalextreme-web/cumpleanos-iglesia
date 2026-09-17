@@ -1,68 +1,42 @@
 rules_version = '2';
+
 service cloud.firestore {
+
   match /databases/{database}/documents {
 
-    // ─── Helpers ─────────────────────────────────────────────────
-    // El ID del documento en admin, lectores y miembros ES el email
-    // (minúsculas), igual que request.auth.token.email.
+    // ── Helpers ──────────────────────────────────────────────────
 
     function esAdmin() {
-      return request.auth != null
-          && request.auth.token.email != null
-          && exists(/databases/$(database)/documents/admin/$(request.auth.token.email));
+      return request.auth != null &&
+             exists(/databases/$(database)/documents/admin/$(request.auth.token.email));
     }
 
-    function esMiembro() {
-      return request.auth != null
-          && request.auth.token.email != null
-          && exists(/databases/$(database)/documents/miembros/$(request.auth.token.email));
-    }
+    // ── Reglas por colección ─────────────────────────────────────
 
-    function esLector() {
-      return request.auth != null
-          && request.auth.token.email != null
-          && exists(/databases/$(database)/documents/lectores/$(request.auth.token.email));
-    }
-
-    function tieneAcceso() {
-      return esAdmin() || esMiembro() || esLector();
-    }
-
-    // ─── miembros/{email} ────────────────────────────────────────
-    // tieneAcceso() → puede leer toda la colección (admin/lector/miembro)
-    // Cualquier autenticado puede leer su PROPIO documento por ID para
-    // que verificarAcceso() compruebe membresía sin permission-denied.
-    match /miembros/{email} {
-      allow read:  if tieneAcceso()
-                  || (request.auth != null
-                      && request.auth.token.email == email);
+    // Miembros del directorio: cualquier usuario autenticado puede leer
+    // (la verificación de acceso real se hace en el cliente con query por correo)
+    match /miembros/{docId} {
+      allow read:  if request.auth != null;
       allow write: if esAdmin();
     }
 
-    // ─── lectores/{email} ────────────────────────────────────────
-    // Cualquier autenticado puede leer su PROPIO documento.
+    // Lectores: cada usuario lee solo su propio documento
     match /lectores/{email} {
-      allow read:  if esAdmin()
-                  || (request.auth != null
-                      && request.auth.token.email == email);
+      allow read:  if request.auth != null && request.auth.token.email == email;
       allow write: if esAdmin();
     }
 
-    // ─── admin/{email} ───────────────────────────────────────────
-    // Cualquier autenticado puede leer su PROPIO documento.
-    // Solo un admin existente puede escribir (impide auto-promoción).
-    match /admin/{email} {
-      allow read:  if esAdmin()
-                  || (request.auth != null
-                      && request.auth.token.email == email);
-      allow write: if esAdmin();
-    }
-
-    // ─── usuarios/{uid} ──────────────────────────────────────────
+    // Usuarios: perfil propio; admin lee todos
     match /usuarios/{uid} {
-      allow read:  if esAdmin()
-                  || (request.auth != null && request.auth.uid == uid);
+      allow read:  if esAdmin();
       allow write: if request.auth != null && request.auth.uid == uid;
     }
+
+    // Admin: cada usuario lee solo su propio documento
+    match /admin/{email} {
+      allow read:  if request.auth != null && request.auth.token.email == email;
+      allow write: if esAdmin();
+    }
+
   }
 }
