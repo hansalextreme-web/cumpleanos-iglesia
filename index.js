@@ -1312,14 +1312,14 @@ function cerrarDetalle() {
 // ─── T8: Upsert de perfil propio tras login exitoso ──────────
 // setDoc + merge: crea el doc si no existe, actualiza si ya existe.
 // ID = uid de Firebase Auth (no email), según US-006.
-async function registrarAcceso(usuario, esAdmin) {
+async function registrarAcceso(usuario, esEsAdmin) {
   try {
     await setDoc(doc(db, 'usuarios', usuario.uid), {
       email:        (usuario.email || '').toLowerCase().trim(),
       nombre:       usuario.displayName || '',
       foto:         usuario.photoURL    || '',
-      esAdmin:      esAdmin,
-      rol:          rolActual,          // 'admin' | 'lector' | 'miembro' | null
+      esAdmin:      esEsAdmin,
+      rol:          rolActual,
       ultimoAcceso: new Date().toISOString(),
     }, { merge: true });
   } catch (err) {

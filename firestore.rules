@@ -13,28 +13,30 @@ service cloud.firestore {
 
     // ── Reglas por colección ─────────────────────────────────────
 
-    // Miembros del directorio: cualquier usuario autenticado puede leer
-    // (la verificación de acceso real se hace en el cliente con query por correo)
+    // Miembros: cualquier autenticado puede leer (query por correo permitida)
     match /miembros/{docId} {
       allow read:  if request.auth != null;
       allow write: if esAdmin();
     }
 
-    // Lectores: cada usuario lee solo su propio documento
+    // Lectores: cada usuario lee su propio doc; admin lista toda la colección
     match /lectores/{email} {
-      allow read:  if request.auth != null && request.auth.token.email == email;
+      allow read:  if esAdmin()
+                  || (request.auth != null && request.auth.token.email == email);
       allow write: if esAdmin();
     }
 
-    // Usuarios: perfil propio; admin lee todos
+    // Usuarios: cada usuario lee/escribe su propio doc; admin lee todos
     match /usuarios/{uid} {
-      allow read:  if esAdmin();
+      allow read:  if esAdmin()
+                  || (request.auth != null && request.auth.uid == uid);
       allow write: if request.auth != null && request.auth.uid == uid;
     }
 
-    // Admin: cada usuario lee solo su propio documento
+    // Admin: cada usuario lee su propio doc; admin lista toda la colección
     match /admin/{email} {
-      allow read:  if request.auth != null && request.auth.token.email == email;
+      allow read:  if esAdmin()
+                  || (request.auth != null && request.auth.token.email == email);
       allow write: if esAdmin();
     }
 
