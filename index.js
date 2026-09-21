@@ -11,7 +11,7 @@ import { getFirestore, collection, getDocs,
          doc, setDoc, deleteDoc, writeBatch,
          getDoc, query, where }               from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getAuth, GoogleAuthProvider,
-         signInWithPopup, signInWithRedirect, getRedirectResult, signOut,
+         signInWithRedirect, getRedirectResult, signOut,
          onAuthStateChanged }                     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
 const firebaseConfig = {
@@ -93,47 +93,29 @@ function registrarEventosLogin() {
   });
 }
 
-// Función para detectar dispositivos móviles
-function esMobile() {
-  return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
-         window.innerWidth <= 768;
-}
-
-// Función de inicio de sesión adaptada para móvil y desktop
+// Función de inicio de sesión — siempre usa redirect
+// signInWithPopup falla con Cross-Origin-Opener-Policy en Vercel/entornos
+// con headers COOP: same-origin. signInWithRedirect funciona en todos los casos.
 async function iniciarSesionConDeteccionMovil() {
   const btnLS = el('btnLoginScreen');
   const errEl = el('loginScreenError');
-  
+
   if (!btnLS) return;
 
-  // Ocultar error anterior
   if (errEl) errEl.style.display = 'none';
-  
-  // Cambiar botón a estado de carga
   btnLS.disabled = true;
   btnLS.innerHTML = '⏳ Ingresando...';
 
   try {
     const provider = new GoogleAuthProvider();
-    
-    if (esMobile()) {
-      // Para móviles: usar redirect (no se bloquea)
-      await signInWithRedirect(auth, provider);
-      // No hay .then() aquí porque la página se redirige
-      // El resultado se maneja en iniciarAuth() con getRedirectResult
-    } else {
-      // Para desktop: usar popup
-      await signInWithPopup(auth, provider);
-      // onAuthStateChanged se encarga del resto
-    }
+    // Redirect funciona en móvil, desktop, y entornos con COOP headers
+    await signInWithRedirect(auth, provider);
+    // La página se redirige — el resultado se captura en getRedirectResult()
   } catch (err) {
     console.error('[Login]', err.code, err.message);
     restaurarBotonLogin();
-    
-    // No mostrar error si el usuario canceló
-    if (err.code === 'auth/popup-closed-by-user' || 
+    if (err.code === 'auth/popup-closed-by-user' ||
         err.code === 'auth/cancelled-popup-request') return;
-        
     mostrarErrorLogin(err, errEl);
   }
 }
@@ -274,7 +256,8 @@ function mostrarNotificacionCumpleanos() {
     return;
   }
   if (Notification.permission !== 'granted') {
-    console.warn('[Notif] Permiso no otorgado:', Notification.permission);
+    // 'denied' es una decisión del usuario, no un error — usar log en vez de warn
+    console.log('[Notif] Permiso no otorgado:', Notification.permission);
     return;
   }
 
