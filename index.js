@@ -519,32 +519,42 @@ function aplicarRol(admin) {
 }
 
 function iniciarAuth() {
-  // Mostrar pantalla de login por defecto hasta verificar sesión
-  mostrarLoginScreen();
+  // Mostrar spinner inmediato — si hay un redirect pendiente de Google,
+  // la página ya viene de vuelta y no debe mostrar la pantalla de login
+  // hasta saber si hay sesión o no.
+  mostrarSpinnerLogin('Cargando...');
 
-  // Manejar resultado de redirect (móviles) al cargar la página
-  getRedirectResult(auth).then(result => {
-    if (result) {
-      console.log('[Auth] Login por redirect exitoso:', result.user.email);
-      // onAuthStateChanged se encargará de verificar permisos
-    }
-  }).catch(err => {
-    console.error('[Auth] Error en redirect result:', err);
-    restaurarBotonLogin();
-    const errEl = el('loginScreenError');
-    mostrarErrorLogin(err, errEl);
-  });
+  // Procesar resultado del redirect ANTES de que onAuthStateChanged tome el control.
+  // Si no hay redirect pendiente, getRedirectResult resuelve con null rápidamente.
+  getRedirectResult(auth)
+    .then(result => {
+      if (result?.user) {
+        console.log('[Auth] Redirect completado:', result.user.email);
+        // onAuthStateChanged se disparará con este usuario automáticamente
+      }
+    })
+    .catch(err => {
+      console.error('[Auth] Error en redirect:', err);
+      ocultarSpinnerLogin();
+      restaurarBotonLogin();
+      mostrarLoginScreen();
+      const errEl = el('loginScreenError');
+      mostrarErrorLogin(err, errEl);
+    });
+
+  // Flag para evitar que onAuthStateChanged muestre loginScreen
+  // mientras getRedirectResult aún está procesando
+  let primeraVez = true;
 
   onAuthStateChanged(auth, async usuario => {
     if (usuario) {
-      // Mostrar spinner mientras se verifican permisos
       mostrarSpinnerLogin('Verificando acceso...');
+      primeraVez = false;
 
       let acceso, rol;
       try {
         ({ acceso, rol } = await verificarAcceso(usuario.email));
       } catch (err) {
-        // Error de red u otro inesperado — restaurar UI y mostrar mensaje
         console.error('[Auth] Error verificando acceso:', err);
         ocultarSpinnerLogin();
         restaurarBotonLogin();
@@ -560,8 +570,6 @@ function iniciarAuth() {
       ocultarSpinnerLogin();
 
       if (!acceso) {
-        // Sin permiso: cerrar sesión automáticamente para no dejar al usuario
-        // en un estado autenticado-pero-bloqueado, y mostrar pantalla denegado.
         await signOut(auth).catch(() => {});
         mostrarPantallaAccesoDenegado(usuario.email);
         return;
@@ -572,25 +580,41 @@ function iniciarAuth() {
       ocultarLoginScreen();
 
       const admin = rol === 'admin';
-      rolActual = rol; // T5: actualizar estado global de rol
+      rolActual = rol;
       el('btnLogin').style.display  = 'none';
       el('userBadge').style.display = '';
       el('userName').textContent    = usuario.displayName || usuario.email;
       el('userAvatar').src          = usuario.photoURL || '';
       aplicarRol(admin);
       registrarAcceso(usuario, admin);
-
-      // Cargar datos solo cuando el usuario está autorizado
       await cargarApp();
 
     } else {
-      ocultarSpinnerLogin();
-      restaurarBotonLogin();
-      mostrarLoginScreen();
-      el('btnLogin').style.display  = '';
-      el('userBadge').style.display = 'none';
-      rolActual = null; // T5: limpiar rol al cerrar sesión
-      aplicarRol(false);
+      // Sin usuario — mostrar login solo si no es la carga inicial
+      // (evita flash del login mientras getRedirectResult procesa)
+      if (primeraVez) {
+        // Esperar un tick para que getRedirectResult pueda resolverse primero
+        setTimeout(() => {
+          if (!auth.currentUser) {
+            ocultarSpinnerLogin();
+            restaurarBotonLogin();
+            mostrarLoginScreen();
+            el('btnLogin').style.display  = '';
+            el('userBadge').style.display = 'none';
+            rolActual = null;
+            aplicarRol(false);
+          }
+        }, 1500);
+      } else {
+        ocultarSpinnerLogin();
+        restaurarBotonLogin();
+        mostrarLoginScreen();
+        el('btnLogin').style.display  = '';
+        el('userBadge').style.display = 'none';
+        rolActual = null;
+        aplicarRol(false);
+      }
+      primeraVez = false;
     }
   });
 
