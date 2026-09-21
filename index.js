@@ -11,7 +11,7 @@ import { getFirestore, collection, getDocs,
          doc, setDoc, deleteDoc, writeBatch,
          getDoc, query, where }               from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getAuth, GoogleAuthProvider,
-         signInWithRedirect, getRedirectResult, signOut,
+         signInWithPopup, signInWithRedirect, getRedirectResult, signOut,
          onAuthStateChanged }                     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
 const firebaseConfig = {
@@ -93,9 +93,17 @@ function registrarEventosLogin() {
   });
 }
 
-// Función de inicio de sesión — siempre usa redirect
-// signInWithPopup falla con Cross-Origin-Opener-Policy en Vercel/entornos
-// con headers COOP: same-origin. signInWithRedirect funciona en todos los casos.
+// Detectar dispositivo móvil real (no tablet desktop)
+function esMobile() {
+  return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i
+           .test(navigator.userAgent);
+}
+
+// Login:
+//   Desktop → signInWithPopup  (rápido, sin loop de redirect)
+//   Móvil   → signInWithRedirect (Chrome Android no soporta popups bien)
+// vercel.json configura COOP: same-origin-allow-popups para que
+// signInWithPopup no sea bloqueado por el header del servidor.
 async function iniciarSesionConDeteccionMovil() {
   const btnLS = el('btnLoginScreen');
   const errEl = el('loginScreenError');
@@ -108,9 +116,14 @@ async function iniciarSesionConDeteccionMovil() {
 
   try {
     const provider = new GoogleAuthProvider();
-    // Redirect funciona en móvil, desktop, y entornos con COOP headers
-    await signInWithRedirect(auth, provider);
-    // La página se redirige — el resultado se captura en getRedirectResult()
+
+    if (esMobile()) {
+      await signInWithRedirect(auth, provider);
+      // La página redirige — resultado capturado en iniciarAuth()
+    } else {
+      await signInWithPopup(auth, provider);
+      // onAuthStateChanged se encarga del resto
+    }
   } catch (err) {
     console.error('[Login]', err.code, err.message);
     restaurarBotonLogin();
@@ -519,18 +532,14 @@ function aplicarRol(admin) {
 }
 
 function iniciarAuth() {
-  // Mostrar spinner inmediato — si hay un redirect pendiente de Google,
-  // la página ya viene de vuelta y no debe mostrar la pantalla de login
-  // hasta saber si hay sesión o no.
+  // Mostrar spinner mientras Firebase determina el estado inicial de sesión
   mostrarSpinnerLogin('Cargando...');
 
-  // Procesar resultado del redirect ANTES de que onAuthStateChanged tome el control.
-  // Si no hay redirect pendiente, getRedirectResult resuelve con null rápidamente.
+  // Capturar resultado de redirect (solo aplica en móvil tras signInWithRedirect)
   getRedirectResult(auth)
     .then(result => {
       if (result?.user) {
         console.log('[Auth] Redirect completado:', result.user.email);
-        // onAuthStateChanged se disparará con este usuario automáticamente
       }
     })
     .catch(err => {
@@ -538,18 +547,12 @@ function iniciarAuth() {
       ocultarSpinnerLogin();
       restaurarBotonLogin();
       mostrarLoginScreen();
-      const errEl = el('loginScreenError');
-      mostrarErrorLogin(err, errEl);
+      mostrarErrorLogin(err, el('loginScreenError'));
     });
-
-  // Flag para evitar que onAuthStateChanged muestre loginScreen
-  // mientras getRedirectResult aún está procesando
-  let primeraVez = true;
 
   onAuthStateChanged(auth, async usuario => {
     if (usuario) {
       mostrarSpinnerLogin('Verificando acceso...');
-      primeraVez = false;
 
       let acceso, rol;
       try {
@@ -590,31 +593,14 @@ function iniciarAuth() {
       await cargarApp();
 
     } else {
-      // Sin usuario — mostrar login solo si no es la carga inicial
-      // (evita flash del login mientras getRedirectResult procesa)
-      if (primeraVez) {
-        // Esperar un tick para que getRedirectResult pueda resolverse primero
-        setTimeout(() => {
-          if (!auth.currentUser) {
-            ocultarSpinnerLogin();
-            restaurarBotonLogin();
-            mostrarLoginScreen();
-            el('btnLogin').style.display  = '';
-            el('userBadge').style.display = 'none';
-            rolActual = null;
-            aplicarRol(false);
-          }
-        }, 1500);
-      } else {
-        ocultarSpinnerLogin();
-        restaurarBotonLogin();
-        mostrarLoginScreen();
-        el('btnLogin').style.display  = '';
-        el('userBadge').style.display = 'none';
-        rolActual = null;
-        aplicarRol(false);
-      }
-      primeraVez = false;
+      // Sin usuario — Firebase ya determinó que no hay sesión activa
+      ocultarSpinnerLogin();
+      restaurarBotonLogin();
+      mostrarLoginScreen();
+      el('btnLogin').style.display  = '';
+      el('userBadge').style.display = 'none';
+      rolActual = null;
+      aplicarRol(false);
     }
   });
 
