@@ -532,10 +532,16 @@ function aplicarRol(admin) {
 }
 
 function iniciarAuth() {
-  // Mostrar spinner mientras Firebase determina el estado inicial de sesión
   mostrarSpinnerLogin('Cargando...');
 
-  // Capturar resultado de redirect (solo aplica en móvil tras signInWithRedirect)
+  // En móvil con redirect, Firebase puede disparar onAuthStateChanged(null)
+  // ANTES de procesar el resultado del redirect. Usamos una Promise para
+  // esperar getRedirectResult antes de decidir si mostrar el login.
+  let redirectResuelto = false;
+  let resolverRedirect;
+  const redirectPromise = new Promise(res => { resolverRedirect = res; });
+
+  // Procesar redirect primero
   getRedirectResult(auth)
     .then(result => {
       if (result?.user) {
@@ -544,10 +550,12 @@ function iniciarAuth() {
     })
     .catch(err => {
       console.error('[Auth] Error en redirect:', err);
-      ocultarSpinnerLogin();
-      restaurarBotonLogin();
       mostrarLoginScreen();
       mostrarErrorLogin(err, el('loginScreenError'));
+    })
+    .finally(() => {
+      redirectResuelto = true;
+      resolverRedirect();
     });
 
   onAuthStateChanged(auth, async usuario => {
@@ -578,7 +586,6 @@ function iniciarAuth() {
         return;
       }
 
-      // Tiene acceso → cargar app
       ocultarPantallaAccesoDenegado();
       ocultarLoginScreen();
 
@@ -593,7 +600,16 @@ function iniciarAuth() {
       await cargarApp();
 
     } else {
-      // Sin usuario — Firebase ya determinó que no hay sesión activa
+      // Sin usuario — esperar a que getRedirectResult resuelva primero.
+      // Esto evita que onAuthStateChanged(null) muestre el login mientras
+      // Chrome móvil aún está procesando el resultado del redirect.
+      if (!redirectResuelto) {
+        await redirectPromise;
+      }
+      // Si después del redirect hay un usuario, onAuthStateChanged
+      // disparará de nuevo con ese usuario — no mostrar login todavía.
+      if (auth.currentUser) return;
+
       ocultarSpinnerLogin();
       restaurarBotonLogin();
       mostrarLoginScreen();
@@ -602,6 +618,15 @@ function iniciarAuth() {
       rolActual = null;
       aplicarRol(false);
     }
+  });
+
+  el('btnLogin').addEventListener('click', iniciarSesionConDeteccionMovil);
+
+  el('btnLogout').addEventListener('click', async () => {
+    await signOut(auth);
+    toast('👋 Sesión cerrada.');
+  });
+}
   });
 
   el('btnLogin').addEventListener('click', iniciarSesionConDeteccionMovil);
