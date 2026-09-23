@@ -64,8 +64,8 @@ async function intentarFirestore(promesa, contexto = 'operación') {
   try {
     return await promesa;
   } catch (err) {
-    if (err?.code === 'permission-denied') {
-      console.warn(`[Firestore] Permiso denegado al ${contexto}.`);
+    if (err && err.code === 'permission-denied') {
+      console.warn('[Firestore] Permiso denegado al ' + contexto + '.');
       return null;
     }
     throw err; // otros errores sí se propagan
@@ -442,7 +442,7 @@ async function verificarAcceso(email) {
     if (!snap.empty) return { acceso: true, rol: 'miembro' };
 
   } catch (err) {
-    if (err?.code === 'permission-denied') {
+    if (err && err.code === 'permission-denied') {
       console.warn('[verificarAcceso] permission-denied para:', emailNorm);
       return { acceso: false, rol: null };
     }
@@ -508,8 +508,9 @@ function mostrarSpinnerLogin(texto = 'Verificando...') {
 }
 
 function ocultarSpinnerLogin() {
-  const btn  = el('btnLoginScreen');
-  const desc = el('loginScreen')?.querySelector('.login-screen__desc');
+  var btn  = el('btnLoginScreen');
+  var ls   = el('loginScreen');
+  var desc = ls ? ls.querySelector('.login-screen__desc') : null;
   if (btn) {
     btn.disabled = false;
     btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg> Ingresar con Google`;
@@ -534,42 +535,41 @@ function aplicarRol(admin) {
 function iniciarAuth() {
   mostrarSpinnerLogin('Cargando...');
 
-  // En móvil con redirect, Firebase puede disparar onAuthStateChanged(null)
-  // ANTES de procesar el resultado del redirect. Usamos una Promise para
-  // esperar getRedirectResult antes de decidir si mostrar el login.
-  let redirectResuelto = false;
-  let resolverRedirect;
-  const redirectPromise = new Promise(res => { resolverRedirect = res; });
+  // En móvil con redirect, Firebase dispara onAuthStateChanged(null)
+  // ANTES de que getRedirectResult procese el resultado.
+  // Usamos una Promise para bloquear el else hasta que el redirect resuelva.
+  var redirectResuelto = false;
+  var resolverRedirect;
+  var redirectPromise = new Promise(function(res) { resolverRedirect = res; });
 
-  // Procesar redirect primero
   getRedirectResult(auth)
-    .then(result => {
-      if (result?.user) {
+    .then(function(result) {
+      if (result && result.user) {
         console.log('[Auth] Redirect completado:', result.user.email);
       }
     })
-    .catch(err => {
+    .catch(function(err) {
       console.error('[Auth] Error en redirect:', err);
       mostrarLoginScreen();
       mostrarErrorLogin(err, el('loginScreenError'));
     })
-    .finally(() => {
+    .finally(function() {
       redirectResuelto = true;
       resolverRedirect();
     });
 
-  onAuthStateChanged(auth, async usuario => {
+  onAuthStateChanged(auth, async function(usuario) {
     if (usuario) {
       mostrarSpinnerLogin('Verificando acceso...');
 
-      let acceso, rol;
+      var resultado;
       try {
-        ({ acceso, rol } = await verificarAcceso(usuario.email));
+        resultado = await verificarAcceso(usuario.email);
       } catch (err) {
         console.error('[Auth] Error verificando acceso:', err);
         ocultarSpinnerLogin();
         restaurarBotonLogin();
-        const errEl = el('loginScreenError');
+        var errEl = el('loginScreenError');
         if (errEl) {
           errEl.textContent   = '📡 Error de conexión. Verifica tu internet e intenta de nuevo.';
           errEl.style.display = 'block';
@@ -578,10 +578,13 @@ function iniciarAuth() {
         return;
       }
 
+      var acceso = resultado.acceso;
+      var rol    = resultado.rol;
+
       ocultarSpinnerLogin();
 
       if (!acceso) {
-        await signOut(auth).catch(() => {});
+        await signOut(auth).catch(function() {});
         mostrarPantallaAccesoDenegado(usuario.email);
         return;
       }
@@ -589,25 +592,23 @@ function iniciarAuth() {
       ocultarPantallaAccesoDenegado();
       ocultarLoginScreen();
 
-      const admin = rol === 'admin';
+      var admin = rol === 'admin';
       rolActual = rol;
       el('btnLogin').style.display  = 'none';
       el('userBadge').style.display = '';
       el('userName').textContent    = usuario.displayName || usuario.email;
-      el('userAvatar').src          = usuario.photoURL || '';
+      el('userAvatar').src          = usuario.photoURL    || '';
       aplicarRol(admin);
       registrarAcceso(usuario, admin);
       await cargarApp();
 
     } else {
-      // Sin usuario — esperar a que getRedirectResult resuelva primero.
-      // Esto evita que onAuthStateChanged(null) muestre el login mientras
-      // Chrome móvil aún está procesando el resultado del redirect.
+      // Esperar a que getRedirectResult termine antes de mostrar login.
+      // Evita el flash del botón de login en Chrome móvil tras redirect.
       if (!redirectResuelto) {
         await redirectPromise;
       }
-      // Si después del redirect hay un usuario, onAuthStateChanged
-      // disparará de nuevo con ese usuario — no mostrar login todavía.
+      // Si tras el redirect Firebase restauró un usuario, no mostrar login.
       if (auth.currentUser) return;
 
       ocultarSpinnerLogin();
@@ -622,16 +623,7 @@ function iniciarAuth() {
 
   el('btnLogin').addEventListener('click', iniciarSesionConDeteccionMovil);
 
-  el('btnLogout').addEventListener('click', async () => {
-    await signOut(auth);
-    toast('👋 Sesión cerrada.');
-  });
-}
-  });
-
-  el('btnLogin').addEventListener('click', iniciarSesionConDeteccionMovil);
-
-  el('btnLogout').addEventListener('click', async () => {
+  el('btnLogout').addEventListener('click', async function() {
     await signOut(auth);
     toast('👋 Sesión cerrada.');
   });
@@ -1379,7 +1371,7 @@ async function cargarListaUsuarios() {
       return (b.ultimoAcceso || '').localeCompare(a.ultimoAcceso || '');
     });
 
-    const emailActual = auth.currentUser?.email;
+    var emailActual = auth.currentUser ? auth.currentUser.email : null;
 
     lista.innerHTML = usuarios.map(u => {
       const esAdminU = adminsSet.has(u.email);
@@ -1467,7 +1459,7 @@ async function cargarListaLectores() {
       lista.innerHTML = '<div class="admins-list__loading">No hay lectores registrados.</div>';
       return;
     }
-    const emailActual = auth.currentUser?.email;
+    var emailActual = auth.currentUser ? auth.currentUser.email : null;
     lista.innerHTML = snap.docs.map(d => `
       <div class="admin-item">
         <span class="admin-item__email">${d.id}</span>
@@ -1479,7 +1471,7 @@ async function cargarListaLectores() {
     });
   } catch (err) {
     console.error('Error al cargar lectores:', err);
-    const msg = err?.code === 'permission-denied'
+    var msg = (err && err.code === 'permission-denied')
       ? '🔒 Solo los administradores pueden ver esta lista.'
       : '❌ Error al cargar lectores.';
     lista.innerHTML = `<div class="admins-list__loading" style="color:var(--peligro)">${msg}</div>`;
@@ -1552,7 +1544,7 @@ async function cargarListaAdmins() {
       return;
     }
 
-    const emailActual = auth.currentUser?.email;
+    var emailActual = auth.currentUser ? auth.currentUser.email : null;
     lista.innerHTML = admins.map(email => `
       <div class="admin-item">
         <span class="admin-item__email">${email}</span>
@@ -1568,7 +1560,7 @@ async function cargarListaAdmins() {
 
   } catch (err) {
     console.error('Error al cargar admins:', err);
-    const msg = err?.code === 'permission-denied'
+    var msg = (err && err.code === 'permission-denied')
       ? '🔒 Solo los administradores pueden ver esta lista.'
       : '❌ Error al cargar administradores.';
     lista.innerHTML = `<div class="admins-list__loading" style="color:var(--peligro)">${msg}</div>`;
