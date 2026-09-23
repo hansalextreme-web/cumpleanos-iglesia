@@ -3,7 +3,7 @@
 //  Versión: 3.0.0
 // ═══════════════════════════════════════════════════
 
-const CACHE_NAME  = 'aposento-v3.1';
+const CACHE_NAME  = 'aposento-v3.2';
 const CACHE_URLS  = [
   '/',
   '/index.html',
@@ -42,9 +42,28 @@ self.addEventListener('activate', e => {
 // Fetch: red primero, caché como respaldo
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+
   const url = new URL(e.request.url);
+
+  // ── Excluir peticiones de Firebase Auth ────────────────────
+  // Firebase usa /__/auth/ para el flujo de signInWithRedirect.
+  // Si el SW intercepta estas peticiones, el login falla en móvil.
+  if (url.pathname.startsWith('/__/auth/')) return;
+
+  // También excluir todos los dominios de Firebase y Google Auth
+  const dominiosAuth = [
+    'identitytoolkit.googleapis.com',
+    'securetoken.googleapis.com',
+    'accounts.google.com',
+    'oauth2.googleapis.com',
+    'firebaseapp.com'
+  ];
+  if (dominiosAuth.some(d => url.hostname.includes(d))) return;
+
+  // ── Solo cachear mismo origen y fuentes Google ─────────────
   const esMismoOrigen = url.origin === self.location.origin;
-  const esFonts = url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
+  const esFonts = url.hostname === 'fonts.googleapis.com' ||
+                  url.hostname === 'fonts.gstatic.com';
 
   if (!esMismoOrigen && !esFonts) return;
 

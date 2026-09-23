@@ -99,11 +99,10 @@ function esMobile() {
            .test(navigator.userAgent);
 }
 
-// Login:
-//   Desktop → signInWithPopup  (rápido, sin loop de redirect)
-//   Móvil   → signInWithRedirect (Chrome Android no soporta popups bien)
-// vercel.json configura COOP: same-origin-allow-popups para que
-// signInWithPopup no sea bloqueado por el header del servidor.
+// ─── Cambio 3: Login con fallback popup → redirect ──────────
+// Intenta primero signInWithPopup (más rápido en desktop y algunos móviles).
+// Si el navegador lo bloquea o lanza auth/popup-blocked / auth/operation-not-supported,
+// cae automáticamente a signInWithRedirect como respaldo universal.
 async function iniciarSesionConDeteccionMovil() {
   const btnLS = el('btnLoginScreen');
   const errEl = el('loginScreenError');
@@ -114,21 +113,53 @@ async function iniciarSesionConDeteccionMovil() {
   btnLS.disabled = true;
   btnLS.innerHTML = '⏳ Ingresando...';
 
-  try {
-    const provider = new GoogleAuthProvider();
+  const provider = new GoogleAuthProvider();
 
-    if (esMobile()) {
+  // En móvil forzamos redirect directamente (más confiable en Chrome Android)
+  if (esMobile()) {
+    try {
       await signInWithRedirect(auth, provider);
-      // La página redirige — resultado capturado en iniciarAuth()
-    } else {
-      await signInWithPopup(auth, provider);
-      // onAuthStateChanged se encarga del resto
+    } catch (err) {
+      console.error('[Login/redirect]', err.code, err.message);
+      restaurarBotonLogin();
+      mostrarErrorLogin(err, errEl);
     }
+    return; // la página se redirige, no hay más código que ejecutar
+  }
+
+  // Desktop: intentar popup primero
+  try {
+    await signInWithPopup(auth, provider);
+    // onAuthStateChanged se encarga del resto
   } catch (err) {
-    console.error('[Login]', err.code, err.message);
-    restaurarBotonLogin();
+    console.error('[Login/popup]', err.code, err.message);
+
+    // Códigos que indican que el popup fue bloqueado o no es compatible
+    const usarRedirect = [
+      'auth/popup-blocked',
+      'auth/operation-not-supported-in-this-environment',
+      'auth/web-storage-unsupported'
+    ].includes(err.code);
+
+    if (usarRedirect) {
+      console.log('[Login] Popup bloqueado — usando redirect como fallback');
+      try {
+        await signInWithRedirect(auth, provider);
+      } catch (err2) {
+        restaurarBotonLogin();
+        mostrarErrorLogin(err2, errEl);
+      }
+      return;
+    }
+
+    // Usuario canceló el popup — no es un error real
     if (err.code === 'auth/popup-closed-by-user' ||
-        err.code === 'auth/cancelled-popup-request') return;
+        err.code === 'auth/cancelled-popup-request') {
+      restaurarBotonLogin();
+      return;
+    }
+
+    restaurarBotonLogin();
     mostrarErrorLogin(err, errEl);
   }
 }
