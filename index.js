@@ -11,12 +11,12 @@ import { getFirestore, collection, getDocs,
          doc, setDoc, deleteDoc, writeBatch,
          getDoc, query, where }               from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getAuth, GoogleAuthProvider,
-         signInWithPopup, signInWithRedirect, getRedirectResult, signOut,
+         signInWithPopup, signOut,
          onAuthStateChanged }                     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
 const firebaseConfig = {
   apiKey:            "AIzaSyCIhq8OkpOLx4cHmIWDEQEF3lHA7F-yS2g",
-  authDomain:        "cumpleanos-iglesia.firebaseapp.com",
+  authDomain:        "cumpleanos-iglesia.vercel.app",
   projectId:         "cumpleanos-iglesia",
   storageBucket:     "cumpleanos-iglesia.firebasestorage.app",
   messagingSenderId: "87953123323",
@@ -93,73 +93,26 @@ function registrarEventosLogin() {
   });
 }
 
-// Detectar dispositivo móvil real (no tablet desktop)
-function esMobile() {
-  return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i
-           .test(navigator.userAgent);
-}
-
-// ─── Cambio 3: Login con fallback popup → redirect ──────────
-// Intenta primero signInWithPopup (más rápido en desktop y algunos móviles).
-// Si el navegador lo bloquea o lanza auth/popup-blocked / auth/operation-not-supported,
-// cae automáticamente a signInWithRedirect como respaldo universal.
+// Login: solo signInWithPopup para todos los dispositivos.
+// El authDomain apunta a cumpleanos-iglesia.vercel.app, lo que permite
+// que Firebase maneje correctamente el popup en Chrome móvil.
 async function iniciarSesionConDeteccionMovil() {
   const btnLS = el('btnLoginScreen');
   const errEl = el('loginScreenError');
-
   if (!btnLS) return;
 
   if (errEl) errEl.style.display = 'none';
   btnLS.disabled = true;
   btnLS.innerHTML = '⏳ Ingresando...';
 
-  const provider = new GoogleAuthProvider();
-
-  // En móvil forzamos redirect directamente (más confiable en Chrome Android)
-  if (esMobile()) {
-    try {
-      await signInWithRedirect(auth, provider);
-    } catch (err) {
-      console.error('[Login/redirect]', err.code, err.message);
-      restaurarBotonLogin();
-      mostrarErrorLogin(err, errEl);
-    }
-    return; // la página se redirige, no hay más código que ejecutar
-  }
-
-  // Desktop: intentar popup primero
   try {
-    await signInWithPopup(auth, provider);
-    // onAuthStateChanged se encarga del resto
+    await signInWithPopup(auth, new GoogleAuthProvider());
+    // onAuthStateChanged toma el control a partir de aquí
   } catch (err) {
-    console.error('[Login/popup]', err.code, err.message);
-
-    // Códigos que indican que el popup fue bloqueado o no es compatible
-    const usarRedirect = [
-      'auth/popup-blocked',
-      'auth/operation-not-supported-in-this-environment',
-      'auth/web-storage-unsupported'
-    ].includes(err.code);
-
-    if (usarRedirect) {
-      console.log('[Login] Popup bloqueado — usando redirect como fallback');
-      try {
-        await signInWithRedirect(auth, provider);
-      } catch (err2) {
-        restaurarBotonLogin();
-        mostrarErrorLogin(err2, errEl);
-      }
-      return;
-    }
-
-    // Usuario canceló el popup — no es un error real
-    if (err.code === 'auth/popup-closed-by-user' ||
-        err.code === 'auth/cancelled-popup-request') {
-      restaurarBotonLogin();
-      return;
-    }
-
+    console.error('[Login]', err.code, err.message);
     restaurarBotonLogin();
+    if (err.code === 'auth/popup-closed-by-user' ||
+        err.code === 'auth/cancelled-popup-request') return;
     mostrarErrorLogin(err, errEl);
   }
 }
@@ -566,29 +519,6 @@ function aplicarRol(admin) {
 function iniciarAuth() {
   mostrarSpinnerLogin('Cargando...');
 
-  // En móvil con redirect, Firebase dispara onAuthStateChanged(null)
-  // ANTES de que getRedirectResult procese el resultado.
-  // Usamos una Promise para bloquear el else hasta que el redirect resuelva.
-  var redirectResuelto = false;
-  var resolverRedirect;
-  var redirectPromise = new Promise(function(res) { resolverRedirect = res; });
-
-  getRedirectResult(auth)
-    .then(function(result) {
-      if (result && result.user) {
-        console.log('[Auth] Redirect completado:', result.user.email);
-      }
-    })
-    .catch(function(err) {
-      console.error('[Auth] Error en redirect:', err);
-      mostrarLoginScreen();
-      mostrarErrorLogin(err, el('loginScreenError'));
-    })
-    .finally(function() {
-      redirectResuelto = true;
-      resolverRedirect();
-    });
-
   onAuthStateChanged(auth, async function(usuario) {
     if (usuario) {
       mostrarSpinnerLogin('Verificando acceso...');
@@ -634,14 +564,6 @@ function iniciarAuth() {
       await cargarApp();
 
     } else {
-      // Esperar a que getRedirectResult termine antes de mostrar login.
-      // Evita el flash del botón de login en Chrome móvil tras redirect.
-      if (!redirectResuelto) {
-        await redirectPromise;
-      }
-      // Si tras el redirect Firebase restauró un usuario, no mostrar login.
-      if (auth.currentUser) return;
-
       ocultarSpinnerLogin();
       restaurarBotonLogin();
       mostrarLoginScreen();
